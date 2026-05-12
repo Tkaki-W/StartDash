@@ -24,8 +24,8 @@ class SerialCommunicator:
     def connect(self):
         try:
             # タイムアウトを適切に設定し、レスポンスを確保
-            self.rx = pyserial.Serial(self.rx_port, self.rx_baud_rate, timeout=0.01)
-            self.tx = pyserial.Serial(self.tx_port, self.tx_baud_rate, timeout=0.01)
+            self.rx = pyserial.Serial(self.rx_port, self.rx_baud_rate, timeout=1)
+            self.tx = pyserial.Serial(self.tx_port, self.tx_baud_rate, timeout=1)
             print(f"Connected to Master={self.rx_port}, Slave={self.tx_port}")
             return True
         except Exception as e:
@@ -78,11 +78,11 @@ class SerialCommunicator:
                         if len(finger_data) >= 5:
                             # 角度に変換
                             angles = [
-                                self.arduino_map(finger_data[0], 400, 700, 10, 170),
-                                180 - self.arduino_map(finger_data[1], 300, 600, 10, 180),
-                                180 - self.arduino_map(finger_data[2], 300, 600, 10, 180),
-                                180 - self.arduino_map(finger_data[3], 200, 500, 10, 180),
-                                180 - self.arduino_map(finger_data[4], 300, 600, 10, 180)
+                                self.arduino_map(finger_data[0], 300, 800, 10, 170),
+                                180 - self.arduino_map(finger_data[1], 300, 600, 10, 160),
+                                180 - self.arduino_map(finger_data[2], 300, 600, 10, 160),
+                                180 - self.arduino_map(finger_data[3], 200, 500, 10, 160),
+                                180 - self.arduino_map(finger_data[4], 400, 600, 10, 160)
                             ]
 
                             # --- 3. スレーブへ角度を送信 ---

@@ -128,7 +128,7 @@ class SerialCommunicator:
 
 if __name__ == "__main__":
     # COMポートはご自身の環境に合わせてください
-    master = SerialCommunicator("COM3", 9600, "COM4", 9600)
+    master = SerialCommunicator("COM5", 9600, "COM4", 9600)
     master.connect()
     master.communicate()
-    master.save_to_csv()
+    #master.save_to_csv()

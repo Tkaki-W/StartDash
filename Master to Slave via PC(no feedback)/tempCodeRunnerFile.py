@@ -59,9 +59,9 @@ class SerialCommunicator:
                             angles=[
                                 int(self.arduino_map(self.finger_data[0],400,700,10,170)),
                                 int(180-self.arduino_map(self.finger_data[1],400,600,10,180)),
-                                int(180-self.arduino_map(self.finger_data[2],400,600,30,180)),
+                                int(180-self.arduino_map(self.finger_data[2],450,600,10,180)),
                                 int(180-self.arduino_map(self.finger_data[3],300,500,10,180)),
-                                int(180-self.arduino_map(self.finger_data[4],500,600,40,180))
+                                int(180-self.arduino_map(self.finger_data[4],400,500,10,180))
                             ]
                             
 
