@@ -57,6 +57,10 @@ def evaluate(model_type="bc"):
     done = False
     total_reward = 0
     
+    # 荷重統計用の記録リスト
+    all_total_forces = []
+    all_sensor_forces = [] # [[f1, f2, f3], ...]
+    
     try:
         while not done:
             # 推論
@@ -70,16 +74,38 @@ def evaluate(model_type="bc"):
             total_reward += reward
             done = terminated or truncated
             
+            # 荷重の記録 (infoから取得)
+            total_f = info.get("total_force", 0.0)
+            sensor_fs = info.get("forces", [0.0]*3)
+            all_total_forces.append(total_f)
+            all_sensor_forces.append(sensor_fs)
+            
             # 状態表示
             step = info.get("step", 0)
-            sys.stdout.write(f"\rStep: {step:3d}/200 ")
+            sys.stdout.write(f"\rStep: {step:3d}/200 | Total Force: {total_f:5.2f} ")
             hw.print_mms_status()
             
             time.sleep(0.05)
     except KeyboardInterrupt:
         pass
     
-    print(f"\nEvaluation Finished. Total Reward: {total_reward}, Success: {info.get('success', False)}")
+    # 統計計算
+    if all_total_forces:
+        avg_f = np.mean(all_total_forces)
+        max_f = np.max(all_total_forces)
+        max_per_sensor = np.max(np.abs(all_sensor_forces), axis=0)
+    else:
+        avg_f = max_f = 0.0
+        max_per_sensor = [0.0]*3
+
+    print(f"\n\n--- Evaluation Results ---")
+    print(f" Success: {info.get('success', False)}")
+    print(f" Total Reward: {total_reward:.2f}")
+    print(f" Average Total Force: {avg_f:.2f} N")
+    print(f" Maximum Total Force: {max_f:.2f} N")
+    print(f" Peak Force per Finger: S1:{max_per_sensor[0]:.2f}N, S2:{max_per_sensor[1]:.2f}N, S3:{max_per_sensor[2]:.2f}N")
+    print("---------------------------\n")
+    
     hw.disconnect()
 
 if __name__ == "__main__":

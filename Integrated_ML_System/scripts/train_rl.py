@@ -33,8 +33,9 @@ def train():
     env = DummyVecEnv([lambda: env])
 
     # 2. PPOモデルの作成
-    # 模倣学習の重みを引き継ぐため、同じネットワーク構造にする必要があります
-    model = PPO("MlpPolicy", env, verbose=1, learning_rate=1e-4)
+    # 模倣学習の重みを引き継ぐため、同じネットワーク構造（[32, 32]）にする必要があります
+    policy_kwargs = dict(net_arch=dict(pi=[32, 32], vf=[32, 32]))
+    model = PPO("MlpPolicy", env, verbose=1, learning_rate=1e-4, policy_kwargs=policy_kwargs)
 
     # 3. BCポリシーのロードと重みの転送
     bc_policy_path = "models/bc_policy.pt"

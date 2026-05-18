@@ -27,6 +27,12 @@ def collect():
     # Negative=Down 座標系でのホーム設定
     home_z = -15.0
 
+    print(f"\nMoving to initial Home (Z={home_z}) and taring sensors...")
+    hw.move_hand([90]*5)
+    hw.cnc.move_to([0.0, 0.0, home_z])
+    hw.wait_cnc()
+    hw.tare_sensors()
+
     print("\n--- 記録モード (UFOキャッチャー) ---")
     print(f" [Space] : ホーム (Z={home_z}) / [Enter] : リフト & 保存")
     print(" [W] : 下へ (Minus) / [S] : 上へ (Plus)")
@@ -49,7 +55,7 @@ def collect():
             
             # アクションの正規化 (角度5 + CNC Z 1)
             norm_angles = (np.array(master_angles) - 90.0) / 80.0
-            cnc_min_z = -35.0; cnc_max_z = 0.0
+            cnc_min_z = -32.0; cnc_max_z = 0.0
             norm_z = (target_pos[2] - cnc_min_z) / (cnc_max_z - cnc_min_z) * 2.0 - 1.0
             action = np.concatenate([norm_angles, [norm_z]])
 
@@ -63,6 +69,10 @@ def collect():
                     print(f"\nReset to Home (Z={home_z}). Starting recording..."); 
                     target_pos = [0.0, 0.0, home_z]
                     hw.move_hand([90]*5); hw.cnc.move_to(target_pos); hw.wait_cnc()
+                    
+                    # ホーム到達後にセンサーをゼロ点調整
+                    hw.tare_sensors()
+                    
                     # ホーム到達後に記録開始
                     recording = True
                     current_traj = []
@@ -79,20 +89,13 @@ def collect():
                     hw.update_sensor_data()
 
                     print("\n>>> Lifting 15mm for verification...")
-                    hw.auto_lift(15.0)
+                    success = hw.auto_lift(15.0)
 
-                    # ユーザーに保存するか確認
-                    print(f"\nSave these {len(current_traj)} steps? (y/n): ", end="", flush=True)
-                    while True:
-                        if msvcrt.kbhit():
-                            choice = msvcrt.getch().lower()
-                            if choice == b'y':
-                                print("Yes! Saved."); 
-                                save_data([current_traj]) # リストで包んで保存
-                                break
-                            elif choice == b'n':
-                                print("No. Discarded."); break
-                        time.sleep(0.01)
+                    if success:
+                        print(f"Lift Success! Saving {len(current_traj)} steps.")
+                        save_data([current_traj])
+                    else:
+                        print("Lift Failed. Data discarded.")
 
                     current_traj = []
 
@@ -106,7 +109,7 @@ def collect():
                     print(" Press [Space] to start next recording.")
 
                 elif key == b'w': 
-                    target_pos[2] = max(-35.0, target_pos[2] - 1.0)
+                    target_pos[2] = max(-32.0, target_pos[2] - 1.0)
                 elif key == b's': 
                     target_pos[2] = min(0.0, target_pos[2] + 1.0)
                 elif key == b'a': target_pos[0] += 1.0

@@ -46,8 +46,8 @@ def train():
     print(f"Total Trajectories: {len(all_trajectories)}")
     transitions = rollout.flatten_trajectories(all_trajectories)
     
-    # 観測 10次元, アクション 6次元
-    observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(10,), dtype=np.float32)
+    # 観測 16次元, アクション 6次元
+    observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float32)
     action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(6,), dtype=np.float32)
 
     bc_trainer = bc.BC(
@@ -59,7 +59,7 @@ def train():
     )
 
     print("--- BC Training Start ---")
-    bc_trainer.train(n_epochs=100)
+    bc_trainer.train(n_epochs=500)
     
     os.makedirs("models", exist_ok=True)
     torch.save(bc_trainer.policy, "models/bc_policy.pt")

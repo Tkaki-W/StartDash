@@ -30,7 +30,7 @@ def fast_move(cnc, pos_mm, feedrate=500):
     return cnc.transaction(cmd)
 
 # --- 設定 ---
-PORT = "COM10" 
+PORT = "COM6" 
 BAUD = 115200
 
 # CNCの初期化
