@@ -3,7 +3,7 @@ import torch
 import sys
 import numpy as np
 import time
-from stable_baselines3 import PPO
+from stable_baselines3 import PPO, SAC
 
 # 自作モジュールのインポート
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -16,7 +16,7 @@ def evaluate(model_type="bc"):
     parser = argparse.ArgumentParser()
     parser.add_argument("--dummy", action="store_true")
     # 既存の main.py からの引数渡しと input() の競合を避けるため、mode も引数で受け取れるようにする
-    parser.add_argument("--mode", choices=["bc", "rl"])
+    parser.add_argument("--mode", choices=["bc", "rl_ppo", "rl_sac"])
     args, unknown = parser.parse_known_args()
 
     if args.mode:
@@ -40,10 +40,9 @@ def evaluate(model_type="bc"):
         if not os.path.exists(path):
             print(f"Error: {path} not found.")
             return
-        # PyTorch 2.6 以降のセキュリティ仕様に対応するため weights_only=False を指定
         policy = torch.load(path, weights_only=False)
         print("Using BC Policy.")
-    else:
+    elif model_type == "rl_ppo":
         path = "models/ppo_finetuned_model.zip"
         if not os.path.exists(path):
             print(f"Error: {path} not found.")
@@ -51,6 +50,17 @@ def evaluate(model_type="bc"):
         model = PPO.load(path)
         policy = model.policy
         print("Using PPO Fine-tuned Policy.")
+    elif model_type == "rl_sac":
+        path = "models/sac_finetuned_model.zip"
+        if not os.path.exists(path):
+            print(f"Error: {path} not found.")
+            return
+        model = SAC.load(path)
+        policy = model.policy
+        print("Using SAC Fine-tuned Policy.")
+    else:
+        print("Unknown model type.")
+        return
 
     print("\n--- Evaluation Start ---")
     obs, _ = env.reset()
