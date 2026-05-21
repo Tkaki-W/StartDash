@@ -242,7 +242,7 @@ class HardwareInterface:
                 cnc_sent = True
         return cnc_sent
 
-    def wait_reach_z(self, target_z, tolerance=0.15, timeout=0.5):
+    def wait_reach_z(self, target_z, tolerance=0.05, timeout=0.5):
         """CNCの高さが目標値に到達するまで待機する"""
         if self.dummy_mode or not self.cnc: return
         start_t = time.time()
