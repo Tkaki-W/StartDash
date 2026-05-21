@@ -33,8 +33,18 @@ def main():
         elif choice == '4':
             os.system(f"{sys.executable} scripts/train_rl_sac.py{args}")
         elif choice == '5':
-            m = input("評価対象 (bc / rl_ppo / rl_sac): ").lower()
-            os.system(f"{sys.executable} scripts/evaluate.py{args} --mode {m}")
+            print("\n評価するモデルを選択してください:")
+            print("1. 模倣学習 (BC)")
+            print("2. 強化学習 (PPO)")
+            print("3. 強化学習 (SAC)")
+            eval_choice = input("選択してください: ")
+            
+            mode_map = {'1': 'bc', '2': 'rl_ppo', '3': 'rl_sac'}
+            m = mode_map.get(eval_choice)
+            if m:
+                os.system(f"{sys.executable} scripts/evaluate.py{args} --mode {m}")
+            else:
+                print("無効な選択です。")
         elif choice == 'd':
             dummy_mode = not dummy_mode
             print(f"ダミーモードを {'ON' if dummy_mode else 'OFF'} にしました。")

@@ -33,9 +33,10 @@ def load_expert_data(data_path):
 
 def train():
     data_dir = "data"
-    files = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.startswith("expert_demo_")]
+    # 新しい形式 (3mm_soft_...) と旧形式 (expert_demo_...) の両方に対応するため、.pkl ファイルをすべて取得
+    files = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.endswith(".pkl")]
     if not files:
-        print("エラー: 訓練データが見つかりません。")
+        print("エラー: 訓練データ (.pkl) が見つかりません。")
         return
     
     all_trajectories = []
@@ -50,16 +51,31 @@ def train():
     observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float32)
     action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(6,), dtype=np.float32)
 
+    # ネットワーク構造 [256, 256] のポリシーを直接作成
+    from stable_baselines3.common.policies import ActorCriticPolicy
+    
+    # 常に一定の学習率を返すダミー関数
+    def constant_lr(_):
+        return 0.001
+
+    custom_policy = ActorCriticPolicy(
+        observation_space=observation_space,
+        action_space=action_space,
+        lr_schedule=constant_lr,
+        net_arch=dict(pi=[256, 256], vf=[256, 256])
+    )
+
     bc_trainer = bc.BC(
         observation_space=observation_space,
         action_space=action_space,
         demonstrations=transitions,
-        batch_size=32,
+        batch_size=64,
+        policy=custom_policy,
         rng=np.random.default_rng(42) # 乱数シードを固定
     )
 
-    print("--- BC Training Start ---")
-    bc_trainer.train(n_epochs=500)
+    print("--- BC Training Start (Net: 256x256, Epochs: 1000) ---")
+    bc_trainer.train(n_epochs=1000)
     
     os.makedirs("models", exist_ok=True)
     torch.save(bc_trainer.policy, "models/bc_policy.pt")

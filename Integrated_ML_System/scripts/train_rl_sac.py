@@ -31,35 +31,36 @@ def train():
     env = RobotHandEnv(hw)
 
     # 2. SACモデルの作成
-    # 模倣学習の重みを引き継ぐため、同じネットワーク構造（[32, 32]）にします
-    # SACはActorとCriticが別なので、net_archの指定方法が少し異なります
-    policy_kwargs = dict(net_arch=dict(pi=[32, 32], qf=[32, 32]))
-    
-    # SACはOff-policyなので、リプレイバッファなどを使用します
-    model = SAC("MlpPolicy", env, verbose=1, learning_rate=3e-4, 
-                policy_kwargs=policy_kwargs, 
-                buffer_size=10000, 
-                learning_starts=100)
-
-    # 3. BCポリシーのロードと重みの転送 (Actorへ)
+    policy_kwargs = dict(net_arch=dict(pi=[256, 256], qf=[256, 256]))
+    rl_model_path = "models/sac_finetuned_model.zip"
     bc_policy_path = "models/bc_policy.pt"
-    if os.path.exists(bc_policy_path):
-        print(f"Loading BC policy from {bc_policy_path}...")
-        bc_policy = torch.load(bc_policy_path, weights_only=False)
-        
-        # SACのActorに重みをコピー
-        # MlpPolicyの場合、features_extractor -> mlp_extractor -> mu という構造になっています
-        try:
-            model.actor.features_extractor.load_state_dict(bc_policy.features_extractor.state_dict())
-            model.actor.mlp_extractor.load_state_dict(bc_policy.mlp_extractor.state_dict())
-            # bc_policy.action_net (Linear) の重みを SACの actor.mu (Linear) にコピー
-            model.actor.mu.load_state_dict(bc_policy.action_net.state_dict())
-            print("BC weights transferred to SAC Actor.")
-        except Exception as e:
-            print(f"Warning: Could not transfer all weights precisely: {e}")
-            print("Starting SAC with default initialization.")
+
+    if os.path.exists(rl_model_path):
+        print(f"Loading existing SAC model from {rl_model_path} for continuation...")
+        model = SAC.load(rl_model_path, env=env, learning_rate=3e-4)
     else:
-        print("Warning: BC policy not found. Starting SAC from scratch.")
+        print("No existing SAC model found. Initializing...")
+        model = SAC("MlpPolicy", env, verbose=1, learning_rate=3e-4, 
+                    policy_kwargs=policy_kwargs, 
+                    buffer_size=10000, 
+                    learning_starts=100)
+
+        # BCポリシーのロードと重みの転送 (Actorへ)
+        if os.path.exists(bc_policy_path):
+            print(f"Loading BC policy from {bc_policy_path} as starting point...")
+            bc_policy = torch.load(bc_policy_path, weights_only=False)
+
+            # SACのActorに重みをコピー
+            try:
+                model.actor.features_extractor.load_state_dict(bc_policy.features_extractor.state_dict())
+                model.actor.mlp_extractor.load_state_dict(bc_policy.mlp_extractor.state_dict())
+                model.actor.mu.load_state_dict(bc_policy.action_net.state_dict())
+                print("BC weights transferred to SAC Actor.")
+            except Exception as e:
+                print(f"Warning: Could not transfer all weights precisely: {e}")
+        else:
+            print("Warning: BC policy not found. Starting SAC from scratch.")
+
 
     # 4. 強化学習 (ファインチューン) の実行
     print("--- SAC RL Fine-tuning Start ---")
