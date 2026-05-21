@@ -28,9 +28,9 @@ def evaluate(model_type="bc"):
 
     try:
         radius = float(input("評価するボールの半径(mm)を入力してください: "))
-        hw.set_ball_radius(radius)
+        hw.ball_radius = radius
     except ValueError:
-        hw.set_ball_radius(0.0)
+        hw.ball_radius = 0.0
 
     env = RobotHandEnv(hw)
     
@@ -92,8 +92,8 @@ def evaluate(model_type="bc"):
             
             # 状態表示
             step = info.get("step", 0)
-            sys.stdout.write(f"\rStep: {step:3d}/200 | Total Force: {total_f:5.2f} ")
-            hw.print_mms_status()
+            prefix = f"Step: {step:3d}/200 | Total Force: {total_f:5.2f}"
+            hw.print_mms_status(prefix=prefix)
             
             time.sleep(0.05)
     except KeyboardInterrupt:
@@ -119,5 +119,4 @@ def evaluate(model_type="bc"):
     hw.disconnect()
 
 if __name__ == "__main__":
-    mode = input("評価するモデルを選択してください (bc/rl): ").lower()
-    evaluate(mode)
+    evaluate()

@@ -19,18 +19,30 @@ def collect():
     hw = HardwareInterface(dummy_mode=args.dummy)
     if not hw.connect(): return
 
+    if not args.dummy and hw.master_ser is None:
+        print("\n[ERROR] データ収集にはマスター手袋が必要です。接続を確認してください。")
+        hw.disconnect()
+        return
+
     try:
         radius = float(input("ボールの半径(mm): "))
         hw.ball_radius = radius
-    except: hw.ball_radius = 0.0
+    except: 
+        radius = 0.0
+        hw.ball_radius = 0.0
+
+    hardness = input("ボールの硬さ (soft / hard): ").lower()
+    if hardness not in ['soft', 'hard']:
+        hardness = "unknown"
 
     # Negative=Down 座標系でのホーム設定
-    home_z = -15.0
+    home_z = 0.0
 
     print(f"\nMoving to initial Home (Z={home_z}) and taring sensors...")
     hw.move_hand([90]*5)
     hw.cnc.move_to([0.0, 0.0, home_z])
     hw.wait_cnc()
+    hw.update_sensor_data(update_cnc=True) # 現在地を正しく同期
     hw.tare_sensors()
 
     print("\n--- 記録モード (UFOキャッチャー) ---")
@@ -44,62 +56,49 @@ def collect():
     recording = False
     current_traj = []
 
+    # 記録タイミング管理用
+    last_record_time = 0
+    record_interval = 0.05 # 20Hz
+
     try:
         while True:
-            hw.update_sensor_data(update_cnc=False) # 通信をスキップして高速化
-            master_angles = getattr(hw, '_latest_master_angles', [90]*5)
-            
-            # CNCの目標値を現在地として観測値に反映 (ラグ防止)
-            hw._latest_cnc_pos[2] = target_pos[2]
+            current_time = time.time()
+            # 1. センサーデータと「現在の状態(Observation)」を取得
+            # 手動で _latest_cnc_pos を上書きするのを止め、実際の状態を反映させる
+            hw.update_sensor_data(update_cnc=False)
             obs = hw.get_observation()
             
-            # アクションの正規化 (角度5 + CNC Z 1)
-            norm_angles = (np.array(master_angles) - 90.0) / 80.0
-            cnc_min_z = -32.0; cnc_max_z = 0.0
-            norm_z = (target_pos[2] - cnc_min_z) / (cnc_max_z - cnc_min_z) * 2.0 - 1.0
-            action = np.concatenate([norm_angles, [norm_z]])
+            # マスター手袋の読み取り
+            master_angles = getattr(hw, '_latest_master_angles', [90]*5)
 
-            # 記録中であればバッファに追加
-            if recording:
-                current_traj.append({"obs": obs, "acts": action})
-
+            # 2. ユーザー入力を受け取り、「次の目標(target_pos)」を決定する
             if msvcrt.kbhit():
                 key = msvcrt.getch().lower()
                 if key == b' ':
-                    print(f"\nReset to Home (Z={home_z}). Starting recording..."); 
+                    print(f"\nReset to Home. Starting recording..."); 
                     target_pos = [0.0, 0.0, home_z]
                     hw.move_hand([90]*5); hw.cnc.move_to(target_pos); hw.wait_cnc()
-                    
-                    # ホーム到達後にセンサーをゼロ点調整
                     hw.tare_sensors()
-                    
-                    # ホーム到達後に記録開始
                     recording = True
                     current_traj = []
+                    last_record_time = 0
+                    continue # リセット時は記録をスキップ
                 
                 elif key == b'\r':
-                    if not recording:
-                        print("\n[Warning] Not recording. Press [Space] first.")
-                        continue
-
+                    if not recording: continue
                     recording = False
-
-                    # 動きが止まるのを待ってからリフトアップ
                     hw.wait_cnc()
                     hw.update_sensor_data()
-
                     print("\n>>> Lifting 15mm for verification...")
                     success = hw.auto_lift(15.0)
-
                     if success:
                         print(f"Lift Success! Saving {len(current_traj)} steps.")
-                        save_data([current_traj])
+                        save_data([current_traj], radius, hardness)
                     else:
                         print("Lift Failed. Data discarded.")
-
                     current_traj = []
-
-                    # 自動的にホームに戻る (-15mm地点)
+                    
+                                    # 自動的にホームに戻る (-15mm地点)
                     print(f"\nReturning to Home (Z={home_z})...")
                     target_pos = [0.0, 0.0, home_z]
                     hw.move_hand([90]*5)
@@ -108,21 +107,47 @@ def collect():
 
                     print(" Press [Space] to start next recording.")
 
-                elif key == b'w': 
-                    target_pos[2] = max(-32.0, target_pos[2] - 1.0)
-                elif key == b's': 
-                    target_pos[2] = min(0.0, target_pos[2] + 1.0)
+                elif key == b'w': target_pos[2] = max(-32.0, target_pos[2] - 1.0)
+                elif key == b's': target_pos[2] = min(0.0, target_pos[2] + 1.0)
                 elif key == b'a': target_pos[0] += 1.0
                 elif key == b'd': target_pos[0] -= 1.0
                 elif key == b'q': target_pos[1] += 1.0
                 elif key == b'e': target_pos[1] -= 1.0
                 elif key == b'\x1b': break
+
+            # 3. 入力「後」の新しい目標値を「アクション」として記録する
+            norm_angles = (np.array(master_angles) - 90.0) / 80.0
+            cnc_min_z = -32.0; cnc_max_z = 0.0
+            norm_z = (target_pos[2] - cnc_min_z) / (cnc_max_z - cnc_min_z) * 2.0 - 1.0
+            action = np.concatenate([norm_angles, [norm_z]])
+
+            # 記録中であればバッファに追加 (20Hz で記録)
+            if recording and (current_time - last_record_time >= record_interval):
+                should_record = False
+                if len(current_traj) == 0:
+                    should_record = True
+                else:
+                    last_action = current_traj[-1]["acts"]
+                    # アクションに変化があるか、あるいは一定周期で強制記録
+                    if np.max(np.abs(action - last_action)) > 0.005:
+                        should_record = True
+                    elif current_time - last_record_time > 0.2: # 動きがなくても0.2秒に1回は記録
+                        should_record = True
+                
+                if should_record:
+                    current_traj.append({"obs": obs, "acts": action})
+                    last_record_time = current_time
+
+            # 4. リアルタイム反映 (同期送信) - ここは常に高速に実行
+            moved = hw.move_sync(master_angles, target_pos[2])
             
-            # リアルタイム反映
-            hw.move_hand(master_angles)
-            hw.cnc.move_to(target_pos)
+            # 5. 実際に動かした場合のみ到達を待機 (高速化のため、記録時以外は待たない)
+            # if moved:
+            #     hw.wait_reach_z(target_pos[2])
+            
+            hw.update_sensor_data(update_cnc=True)
             hw.print_mms_status()
-            time.sleep(0.05)
+            time.sleep(0.005) # ループ自体は高速(200Hz程度)にして操作感を滑らかにする
 
     except KeyboardInterrupt:
         print("\nInterrupted by user.")
@@ -130,10 +155,10 @@ def collect():
         hw.disconnect()
         print("\nCollection session ended.")
 
-def save_data(data_log):
+def save_data(data_log, radius, hardness):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     os.makedirs("data", exist_ok=True)
-    filename = f"data/expert_demo_{timestamp}.pkl"
+    filename = f"data/{int(radius)}mm_{hardness}_{timestamp}.pkl"
     with open(filename, 'wb') as f: pickle.dump(data_log, f)
     print(f"\nSaved {len(data_log)} samples to {filename}")
 
