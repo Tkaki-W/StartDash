@@ -38,9 +38,10 @@ def train():
     env = DummyVecEnv([lambda: env])
 
     # 2. PPOモデルの作成
-    # 模倣学習に合わせて [256, 256] に、観測空間は 10次元
-    policy_kwargs = dict(net_arch=dict(pi=[256, 256], vf=[256, 256]))
-    rl_model_path = "models/ppo_finetuned_model.zip"
+    # 模倣学習の重みを引き継ぐため、同じネットワーク構造にする必要があります
+    model = PPO("MlpPolicy", env, verbose=1, learning_rate=1e-4)
+
+    # 3. BCポリシーのロードと重みの転送
     bc_policy_path = "models/bc_policy.pt"
 
     if os.path.exists(rl_model_path):

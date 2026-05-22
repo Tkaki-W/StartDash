@@ -10,11 +10,11 @@ class RobotHandEnv(gym.Env):
 
         # Action: [角度5, CNC Z 1] = 6次元
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(6,), dtype=np.float32)
-        # Observation: [MMS1 Fz, MMS2 Fz, MMS3 Fz, CNC Z 1, Radius 1, Angles 5] = 10次元
+        # Observation: [MMS Fx,Fy,Fz 3, CNC Z 1, Radius 1, Angles 5]
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(10,), dtype=np.float32)
 
         # 範囲設定 (Negative=Down 座標系)
-        self.cnc_min_z = -32.0
+        self.cnc_min_z = -35.0
         self.cnc_max_z = 0.0
         self.home_z = 0.0 
         
@@ -33,27 +33,15 @@ class RobotHandEnv(gym.Env):
         self.current_step = 0
         self.smoothed_action = np.zeros(6)
         
-        # 統計リセット
-        self.episode_forces = []
-        self.episode_penalties = 0.0
-        
         # 現在のX,Y位置を取得して保持
         pos, _ = self.hw.cnc.get_current_pos()
         self.start_xy = [pos[0], pos[1]]
         self.last_sent_z = self.home_z
 
-        # ホームに戻る
-        print(f"\n--- Resetting to Home Position (Z={self.home_z}) ---")
+        # ホーム(Z=-15mm)に戻る
         self.hw.move_hand([90]*5)
         self.hw.cnc.move_to([self.start_xy[0], self.start_xy[1], self.home_z])
         self.hw.wait_cnc()
-        
-        # 次の試行のための準備待ち
-        input("ボールをセットし、準備ができたら Enter キーを押して次の試行を開始してください...")
-        
-        # 初期位置到達後にセンサーをゼロ点調整 (Tare)
-        self.hw.tare_sensors()
-        
         self.hw.update_sensor_data(update_cnc=True)
         return self.hw.get_observation(), {}
 
@@ -83,63 +71,29 @@ class RobotHandEnv(gym.Env):
         # 3. ハードウェアへの同期指令
         moved = self.hw.move_sync(hand_angles, target_z)
         
-        # 4. 高さが動いた場合のみ到達を待機 (高速化)
-        if moved:
-            self.hw.wait_reach_z(target_z)
+        # CNCの指示を間引く (0.2mm以上の変化時のみ)
+        if self.last_sent_z is None or abs(target_z - self.last_sent_z) > 1:
+            self.hw.cnc.move_to([self.start_xy[0], self.start_xy[1], target_z])
+            self.last_sent_z = target_z
+            time.sleep(0.01) # 通信の安定化
         
-        # 5. 観測値の生成
-        self.hw.update_sensor_data(update_cnc=True)
+        # 4. 観測値の生成
+        self.hw.update_sensor_data(update_cnc=False)
+        self.hw._latest_cnc_pos[2] = target_z 
         obs = self.hw.get_observation()
 
-        # 5. 報酬計算と終了判定
+        # 5. 終了判定
         done = self.current_step >= self.max_steps
-        
-        # 接触報酬 (Fzが -1.0 ～ -0.3 の範囲にある場合のみ加算)
-        # 0.0～-0.3（触れていない・弱すぎ）、-1.0以下（強すぎ）は0点
-        contact_reward_count = 0
-        for fz in self.hw.last_fz_values:
-            if -5.0 <= fz <= -0.3:
-                contact_reward_count += 1
-        reward = contact_reward_count * 0.1 
-
-        # 荷重計算 (ペナルティは無効だが、ログ用に計算は行う)
-        total_force = sum([abs(fz) for fz in self.hw.last_fz_values])
-        
-        # 荷重ペナルティ (研究のため一時無効化)
-        # force_penalty = total_force * 0.02 
-        # reward -= force_penalty
-        
-        # 統計更新
-        self.episode_forces.append(total_force)
-        # self.episode_penalties += force_penalty
-
         success = False
+        reward = 0.0
+
         if done:
             self.hw.wait_cnc()
             print("\n>>> Time up! Attempting Auto-Lift...")
             success = self.hw.auto_lift(15.0)
-            
-            # エピソード統計の表示
-            # avg_f = np.mean(self.episode_forces) if self.episode_forces else 0.0
-            # max_f = np.max(self.episode_forces) if self.episode_forces else 0.0
-            print(f"\n--- Episode Summary ---")
-            print(f" Success: {success}")
-            # print(f" Avg Force: {avg_f:.2f} N")
-            # print(f" Max Force: {max_f:.2f} N")
-            # print(f" Total Force Penalty: -{self.episode_penalties:.2f}")
-            print(f"-----------------------\n")
-            
-            if success:
-                reward += 100.0
+            reward = 100.0 if success else 0.0
         
-        info = {
-            "success": success, 
-            "step": self.current_step,
-            "total_force": total_force,
-            "forces": list(self.hw.last_fz_values)
-        }
-
-        return obs, reward, done, False, info
+        return obs, reward, done, False, {"success": success, "step": self.current_step}
 
     def close(self):
         self.hw.disconnect()

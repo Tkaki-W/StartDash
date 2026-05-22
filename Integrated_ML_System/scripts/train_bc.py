@@ -106,8 +106,8 @@ def train():
         rng=np.random.default_rng(42) # 乱数シードを固定
     )
 
-    print("--- BC Training Start (Net: 256x256, Epochs: 1000) ---")
-    bc_trainer.train(n_epochs=300)
+    print("--- BC Training Start ---")
+    bc_trainer.train(n_epochs=100)
     
     os.makedirs("models", exist_ok=True)
     torch.save(bc_trainer.policy, "models/bc_policy.pt")

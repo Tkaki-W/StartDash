@@ -119,11 +119,11 @@ class FingerMMS101Communicator:
                         if len(finger_data) >= 5:
                             # 角度に変換
                             angles = [
-                                self.arduino_map(finger_data[0], 300, 700, 0, 180),
-                                180 - self.arduino_map(finger_data[1], 300, 600, 0, 160),
-                                180 - self.arduino_map(finger_data[2], 300, 600, 0, 160),
-                                180 - self.arduino_map(finger_data[3], 200, 500, 0, 160),
-                                180 - self.arduino_map(finger_data[4], 300, 600, 0, 160)
+                                self.arduino_map(finger_data[0], 300, 800, 10, 170),
+                                180 - self.arduino_map(finger_data[1], 300, 600, 10, 160),
+                                180 - self.arduino_map(finger_data[2], 300, 600, 10, 160),
+                                180 - self.arduino_map(finger_data[3], 200, 500, 10, 160),
+                                180 - self.arduino_map(finger_data[4], 400, 600, 10, 160)
                             ]
 
                             # --- 4. スレーブへ角度を送信 ---
@@ -181,7 +181,7 @@ if __name__ == "__main__":
     # 環境に合わせて変更してください
     MASTER_PORT = "COM5"
     SLAVE_PORT = "COM4"
-    MMS_PORT = "COM15"
+    MMS_PORT = "COM9"
     
     app = FingerMMS101Communicator(MASTER_PORT, SLAVE_PORT, MMS_PORT)
     if app.connect():

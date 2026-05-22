@@ -70,11 +70,11 @@ class SerialCommunicator:
 
                         if len(self.finger_data) >= 5:
                             angles = [
-                                self.arduino_map(self.finger_data[0], 300, 600, 10, 180),
-                                180 - self.arduino_map(self.finger_data[1], 400, 600, 0, 160),
-                                180 - self.arduino_map(self.finger_data[2], 400, 600, 0, 160),
-                                180 - self.arduino_map(self.finger_data[3], 400, 600, 0, 160),
-                                180 - self.arduino_map(self.finger_data[4], 400, 600, 0, 160)
+                                int(self.arduino_map(self.finger_data[0], 400, 700, 10, 170)),
+                                int(180 - self.arduino_map(self.finger_data[1], 300, 600, 10, 180)),
+                                int(180 - self.arduino_map(self.finger_data[2], 300, 600, 10, 180)),
+                                int(180 - self.arduino_map(self.finger_data[3], 200, 500, 10, 180)),
+                                int(180 - self.arduino_map(self.finger_data[4], 300, 600, 10, 180))
                             ]
 
                             send_data = ",".join(map(str, angles)) + "\n"
