@@ -47,7 +47,7 @@ def evaluate(model_type="bc"):
         if not os.path.exists(path):
             print(f"Error: {path} not found.")
             return
-        model = PPO.load(path)
+        model = PPO.load(path, env=env)
         policy = model.policy
         print("Using PPO Fine-tuned Policy.")
     elif model_type == "rl_sac":
@@ -55,7 +55,7 @@ def evaluate(model_type="bc"):
         if not os.path.exists(path):
             print(f"Error: {path} not found.")
             return
-        model = SAC.load(path)
+        model = SAC.load(path, env=env)
         policy = model.policy
         print("Using SAC Fine-tuned Policy.")
     else:
@@ -74,7 +74,16 @@ def evaluate(model_type="bc"):
     try:
         while not done:
             # 推論
-            obs_tensor = torch.as_tensor(obs).unsqueeze(0)
+            # 念のため、ここで観測値を10次元に確実に変換する (Fz x 3 + Z + Radius + Angles x 5)
+            if len(obs) == 16:
+                obs_10d = np.concatenate([
+                    obs[[2, 5, 8]], # Fz values
+                    obs[9:]          # CNC Z, Radius, Angles
+                ])
+            else:
+                obs_10d = obs
+
+            obs_tensor = torch.as_tensor(obs_10d, dtype=torch.float32).unsqueeze(0)
             with torch.no_grad():
                 action_tensor, _, _ = policy(obs_tensor)
             action = action_tensor.numpy()[0]
@@ -92,7 +101,7 @@ def evaluate(model_type="bc"):
             
             # 状態表示
             step = info.get("step", 0)
-            prefix = f"Step: {step:3d}/200 | Total Force: {total_f:5.2f}"
+            prefix = f"Step: {step:3d}/500 | Total Force: {total_f:5.2f}"
             hw.print_mms_status(prefix=prefix)
             
             time.sleep(0.05)

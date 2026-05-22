@@ -159,7 +159,7 @@ class HardwareInterface:
                         if line.count(',') >= 4:
                             data = [float(x) for x in line.split(',')]
                             self._latest_master_angles = [
-                                self.arduino_map(data[0], 300, 700, 0, 180),
+                                self.arduino_map(data[0], 400, 700, 20, 170),
                                 180 - self.arduino_map(data[1], 300, 600, 0, 160),
                                 180 - self.arduino_map(data[2], 300, 600, 0, 160),
                                 180 - self.arduino_map(data[3], 200, 500, 0, 160),
@@ -182,11 +182,22 @@ class HardwareInterface:
 
     def get_observation(self):
         with self.lock:
-            norm_angles = (np.array(self._latest_slave_angles) - 90.0) / 80.0
+            # 各指の正規化を統一する (+1.0 = 閉じ, -1.0 = 開き)
+            # ハードウェア設定に基づく中心点: 親指=95, 他=100
+            raw_angles = np.array(self._latest_slave_angles)
+            norm_angles = np.zeros(5, dtype=np.float32)
+            
+            # 親指 (idx 0): 170(閉) -> +1.0, 20(開) -> -1.0
+            norm_angles[0] = (raw_angles[0] - 95.0) / 75.0
+            
+            # 他の指 (idx 1-4): 20(閉) -> +1.0, 180(開) -> -1.0
+            norm_angles[1:] = -(raw_angles[1:] - 100.0) / 80.0
+
+            # Fz (垂直荷重) だけを抽出
             return np.concatenate([
-                self._latest_mms_data[:3], 
-                self._latest_mms2_data[:3],
-                self._latest_mms3_data[:3],
+                [self._latest_mms_data[2]], 
+                [self._latest_mms2_data[2]],
+                [self._latest_mms3_data[2]],
                 [self._latest_cnc_pos[2]], 
                 [self.ball_radius], 
                 norm_angles
@@ -242,7 +253,7 @@ class HardwareInterface:
                 cnc_sent = True
         return cnc_sent
 
-    def wait_reach_z(self, target_z, tolerance=0.05, timeout=0.5):
+    def wait_reach_z(self, target_z, tolerance=0.1, timeout=0.5):
         """CNCの高さが目標値に到達するまで待機する"""
         if self.dummy_mode or not self.cnc: return
         start_t = time.time()

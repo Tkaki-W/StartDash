@@ -16,7 +16,8 @@ def analyze():
     print("="*50)
 
     # 1. 模倣学習データ (Expert Data) の集計
-    expert_stats = defaultdict(int)
+    expert_file_counts = defaultdict(int)
+    expert_step_counts = defaultdict(int)
 
     if os.path.exists(data_dir):
         files = [f for f in os.listdir(data_dir) if f.endswith(".pkl")]
@@ -30,36 +31,48 @@ def analyze():
             else:
                 label = "other format"
             
-            expert_stats[label] += 1
+            expert_file_counts[label] += 1
+            
+            # ステップ数を計測
+            try:
+                with open(os.path.join(data_dir, f), 'rb') as pkl:
+                    traj = pickle.load(pkl)
+                    # データの形式（リストのリストか単一リストか）を判定
+                    steps = len(traj[0]) if isinstance(traj[0], list) and len(traj) > 0 else len(traj)
+                    expert_step_counts[label] += steps
+            except:
+                pass
 
     print(f"\n[1] 模倣学習用データ (エキスパート実演)")
-    if not expert_stats:
+    if not expert_file_counts:
         print("  データが見つかりません。")
     else:
-        for label, count in sorted(expert_stats.items()):
-            print(f"  - {label}: {count} 件")
+        for label in sorted(expert_file_counts.keys()):
+            count = expert_file_counts[label]
+            total_steps = expert_step_counts[label]
+            avg_steps = total_steps / count if count > 0 else 0
+            print(f"  - {label}: {count} 件 (平均 {int(avg_steps)} ステップ/件)")
 
     # 2. 強化学習履歴 (RL History) の集計
-    log_file = "logs/rl_history.csv"
     rl_stats = defaultdict(lambda: {"episodes": 0, "successes": 0, "total_reward": 0.0})
 
     if os.path.exists(log_file):
         with open(log_file, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                label = f"{int(float(row['radius']))}mm_{row['hardness']}"
+                label = f"{int(float(row['radius']))}mm {row['hardness']}"
                 rl_stats[label]["episodes"] += 1
                 rl_stats[label]["successes"] += int(row["success"])
                 rl_stats[label]["total_reward"] += float(row["reward"])
 
     print(f"\n[2] 強化学習の経験 (自己試行錯誤)")
     if not rl_stats:
-        print("  履歴が見つかりません。")
+        print("  履歴が見つかりません (logs/rl_history.csv なし)")
     else:
-        for label, stats in rl_stats.items():
+        for label, stats in sorted(rl_stats.items()):
             succ_rate = (stats["successes"] / stats["episodes"]) * 100
             avg_rew = stats["total_reward"] / stats["episodes"]
-            print(f"  - {label.replace('_', ' ')}:")
+            print(f"  - {label}:")
             print(f"      試行回数: {stats['episodes']} エピソード")
             print(f"      成功率  : {succ_rate:.1f}% ({stats['successes']}/{stats['episodes']})")
             print(f"      平均報酬: {avg_rew:.2f}")

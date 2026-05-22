@@ -10,8 +10,8 @@ class RobotHandEnv(gym.Env):
 
         # Action: [角度5, CNC Z 1] = 6次元
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(6,), dtype=np.float32)
-        # Observation: [MMS1 3, MMS2 3, MMS3 3, CNC Z 1, Radius 1, Angles 5] = 16次元
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float32)
+        # Observation: [MMS1 Fz, MMS2 Fz, MMS3 Fz, CNC Z 1, Radius 1, Angles 5] = 10次元
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(10,), dtype=np.float32)
 
         # 範囲設定 (Negative=Down 座標系)
         self.cnc_min_z = -32.0
@@ -19,14 +19,14 @@ class RobotHandEnv(gym.Env):
         self.home_z = 0.0 
         
         # 試行の設定
-        self.max_steps = 200 
+        self.max_steps = 1000 
         self.current_step = 0
         
         # 内部状態
         self.start_xy = [0.0, 0.0]
         self.last_sent_z = None
         self.smoothed_action = None
-        self.alpha = 0.2 # 小さいほど滑らか (0.1~0.3推奨)
+        self.alpha = 1 # 小さいほど滑らか (0.1~0.3推奨)
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -66,8 +66,18 @@ class RobotHandEnv(gym.Env):
         else:
             self.smoothed_action = action
         
-        # 2. 値の分解
-        hand_angles = ((self.smoothed_action[:5] + 1.0) / 2.0 * 160.0 + 10.0).astype(int)
+        # 2. 値の分解 (AIの出力: +1.0 = 閉じ, -1.0 = 開き に統一)
+        hand_angles = np.zeros(5, dtype=int)
+        
+        # 親指 (idx 0): 170=閉, 20=開 (中心 95)
+        hand_angles[0] = int(self.smoothed_action[0] * 75.0 + 95.0)
+        
+        # 他の指 (idx 1-4): 20=閉, 180=開 (中心 100)
+        hand_angles[1:] = (100.0 - (self.smoothed_action[1:5] * 80.0)).astype(int)
+        
+        # 安全ガード: 10〜175度の範囲に収める
+        hand_angles = np.clip(hand_angles, 10, 175)
+
         target_z = (self.smoothed_action[5] + 1.0) / 2.0 * (self.cnc_max_z - self.cnc_min_z) + self.cnc_min_z
         
         # 3. ハードウェアへの同期指令
@@ -84,9 +94,13 @@ class RobotHandEnv(gym.Env):
         # 5. 報酬計算と終了判定
         done = self.current_step >= self.max_steps
         
-        # 接触報酬
-        contact_count = sum(self.hw.contact_statuses)
-        reward = contact_count * 0.1 
+        # 接触報酬 (Fzが -1.0 ～ -0.3 の範囲にある場合のみ加算)
+        # 0.0～-0.3（触れていない・弱すぎ）、-1.0以下（強すぎ）は0点
+        contact_reward_count = 0
+        for fz in self.hw.last_fz_values:
+            if -5.0 <= fz <= -0.3:
+                contact_reward_count += 1
+        reward = contact_reward_count * 0.1 
 
         # 荷重計算 (ペナルティは無効だが、ログ用に計算は行う)
         total_force = sum([abs(fz) for fz in self.hw.last_fz_values])

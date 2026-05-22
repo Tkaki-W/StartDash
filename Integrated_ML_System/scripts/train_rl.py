@@ -38,6 +38,7 @@ def train():
     env = DummyVecEnv([lambda: env])
 
     # 2. PPOモデルの作成
+    # 模倣学習に合わせて [256, 256] に、観測空間は 10次元
     policy_kwargs = dict(net_arch=dict(pi=[256, 256], vf=[256, 256]))
     rl_model_path = "models/ppo_finetuned_model.zip"
     bc_policy_path = "models/bc_policy.pt"
