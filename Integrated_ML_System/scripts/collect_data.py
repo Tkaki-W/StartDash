@@ -56,56 +56,48 @@ def collect():
     recording = False
     current_traj = []
 
-    # 記録タイミング管理用
+    # 状態管理
+    # 0: 待機, 1: アプローチ中 (REACH), 2: 把持中 (GRASP)
+    phase = 0
+    reach_traj = []
+    grasp_traj = []
+    
     last_record_time = 0
-    record_interval = 0.05 # 20Hz
+    record_interval = 0.05
 
     try:
         while True:
             current_time = time.time()
-            # 1. センサーデータと「現在の状態(Observation)」を取得
-            # 物理的な読み戻し(update_cnc=True)はラグの原因になるため、内部保持値(False)を使う
             hw.update_sensor_data(update_cnc=False)
             obs = hw.get_observation()
-            
-            # マスター手袋の読み取り
             master_angles = getattr(hw, '_latest_master_angles', [90]*5)
 
-            # 2. ユーザー入力を受け取り、「次の目標(target_pos)」を決定する
             if msvcrt.kbhit():
                 key = msvcrt.getch().lower()
                 if key == b' ':
-                    print(f"\nReset to Home. Starting recording..."); 
+                    print(f"\n[PHASE: REACH] Starting Reach Phase. Move CNC near ball..."); 
                     target_pos = [0.0, 0.0, home_z]
                     hw.move_hand([90]*5); hw.cnc.move_to(target_pos); hw.wait_cnc()
                     hw.tare_sensors()
-                    recording = True
-                    current_traj = []
+                    phase = 1
+                    reach_traj = []; grasp_traj = []
                     last_record_time = 0
-                    continue # リセット時は記録をスキップ
+                    continue
                 
                 elif key == b'\r':
-                    if not recording: continue
-                    recording = False
-                    hw.wait_cnc()
-                    hw.update_sensor_data()
-                    print("\n>>> Lifting 15mm for verification...")
-                    success = hw.auto_lift(15.0)
-                    if success:
-                        print(f"Lift Success! Saving {len(current_traj)} steps.")
-                        save_data([current_traj], radius, hardness)
-                    else:
-                        print("Lift Failed. Data discarded.")
-                    current_traj = []
-                    
-                                    # 自動的にホームに戻る (-15mm地点)
-                    print(f"\nReturning to Home (Z={home_z})...")
-                    target_pos = [0.0, 0.0, home_z]
-                    hw.move_hand([90]*5)
-                    hw.cnc.move_to(target_pos)
-                    hw.wait_cnc()
-
-                    print(" Press [Space] to start next recording.")
+                    if phase == 1:
+                        print(f"\n[PHASE: GRASP] Reach finished ({len(reach_traj)} steps). Now grasp the ball!")
+                        phase = 2
+                    elif phase == 2:
+                        print(f"\n[DONE] Grasp finished ({len(grasp_traj)} steps). Verifying lift...")
+                        hw.wait_cnc()
+                        success = hw.auto_lift(15.0)
+                        if success:
+                            save_dual_data(reach_traj, grasp_traj, radius, hardness)
+                        else:
+                            print("Lift Failed. Data discarded.")
+                        phase = 0
+                    continue
 
                 elif key == b'w': target_pos[2] = max(-32.0, target_pos[2] - 1.0)
                 elif key == b's': target_pos[2] = min(0.0, target_pos[2] + 1.0)
@@ -115,39 +107,35 @@ def collect():
                 elif key == b'e': target_pos[1] -= 1.0
                 elif key == b'\x1b': break
 
-            # 3. 入力「後」の新しい目標値を「アクション」として記録する
-            norm_angles = (np.array(master_angles) - 90.0) / 80.0
-            cnc_min_z = -32.0; cnc_max_z = 0.0
-            norm_z = (target_pos[2] - cnc_min_z) / (cnc_max_z - cnc_min_z) * 2.0 - 1.0
-            action = np.concatenate([norm_angles, [norm_z]])
+            # アクション生成 (AI入力ルール +1.0=閉, -1.0=開)
+            norm_angles = np.zeros(5)
+            norm_angles[0] = (master_angles[0] - 95.0) / 75.0
+            norm_angles[1:] = -(np.array(master_angles[1:]) - 100.0) / 80.0
+            
+            # Zの正規化 (一発降下用)
+            norm_z = (target_pos[2] / 16.0) + 1.0
 
-            # 記録中であればバッファに追加 (20Hz で記録)
-            if recording and (current_time - last_record_time >= record_interval):
-                should_record = False
-                if len(current_traj) == 0:
-                    should_record = True
+            # 記録処理 (20Hz)
+            if phase > 0 and (current_time - last_record_time >= record_interval):
+                if phase == 1:
+                    # REACHフェーズ: obsは1次元(半径のみ), actsは1次元(目標Zのみ)
+                    reach_traj.append({
+                        "obs": np.array([hw.ball_radius / 10.0]), # ミニマム保存
+                        "acts": np.array([norm_z])
+                    })
+                    moved = hw.move_sync([90]*5, target_pos[2])
                 else:
-                    last_action = current_traj[-1]["acts"]
-                    # アクションに変化があるか、あるいは一定周期で強制記録
-                    if np.max(np.abs(action - last_action)) > 0.005:
-                        should_record = True
-                    elif current_time - last_record_time > 0.2: # 動きがなくても0.2秒に1回は記録
-                        should_record = True
-                
-                if should_record:
-                    current_traj.append({"obs": obs, "acts": action})
-                    last_record_time = current_time
-
-            # 4. リアルタイム反映 (同期送信) - ここは常に高速に実行
-            moved = hw.move_sync(master_angles, target_pos[2])
-            
-            # 5. 実際に動かした場合のみ到達を待機 (高速化のため、記録時以外は待たない)
-            # if moved:
-            #     hw.wait_reach_z(target_pos[2])
-            
+                    # GRASPフェーズ: obsは9次元, actsは5次元
+                    grasp_traj.append({"obs": obs, "acts": norm_angles})
+                    moved = hw.move_sync(master_angles, target_pos[2])
+                last_record_time = current_time
+            else:
+                # 記録タイミング以外
+                current_hand_target = [90]*5 if phase == 1 else master_angles
+                moved = hw.move_sync(current_hand_target, target_pos[2])
             hw.update_sensor_data(update_cnc=False)
-            hw.print_mms_status()
-            time.sleep(0.005) # ループ自体は高速(200Hz程度)にして操作感を滑らかにする
+            hw.print_mms_status(prefix=f"[{'REACH' if phase==1 else 'GRASP' if phase==2 else 'IDLE'}]")
+            time.sleep(0.005)
 
     except KeyboardInterrupt:
         print("\nInterrupted by user.")
@@ -155,12 +143,18 @@ def collect():
         hw.disconnect()
         print("\nCollection session ended.")
 
-def save_data(data_log, radius, hardness):
+def save_dual_data(reach_traj, grasp_traj, radius, hardness):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     os.makedirs("data", exist_ok=True)
-    filename = f"data/{int(radius)}mm_{hardness}_{timestamp}.pkl"
-    with open(filename, 'wb') as f: pickle.dump(data_log, f)
-    print(f"\nSaved {len(data_log)} samples to {filename}")
+    
+    reach_file = f"data/{int(radius)}mm_{hardness}_reach_{timestamp}.pkl"
+    grasp_file = f"data/{int(radius)}mm_{hardness}_grasp_{timestamp}.pkl"
+    
+    with open(reach_file, 'wb') as f: pickle.dump([reach_traj], f)
+    with open(grasp_file, 'wb') as f: pickle.dump([grasp_traj], f)
+    
+    print(f"\nSaved Reach: {len(reach_traj)} steps, Grasp: {len(grasp_traj)} steps.")
+    print(f"Files: {reach_file}, {grasp_file}")
 
 if __name__ == "__main__":
     collect()

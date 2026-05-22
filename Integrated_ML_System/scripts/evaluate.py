@@ -12,6 +12,16 @@ from envs.robot_hand_env import RobotHandEnv
 
 import argparse
 
+# 1. REACHモデルの設計図 (保存されたモデルを読み込むために必要)
+class ReachRegressor(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.net = torch.nn.Sequential(
+            torch.nn.Linear(1, 16), torch.nn.ReLU(),
+            torch.nn.Linear(16, 1)
+        )
+    def forward(self, x): return self.net(x)
+
 def evaluate(model_type="bc"):
     parser = argparse.ArgumentParser()
     parser.add_argument("--dummy", action="store_true")
@@ -32,16 +42,26 @@ def evaluate(model_type="bc"):
     except ValueError:
         hw.ball_radius = 0.0
 
-    env = RobotHandEnv(hw)
+    # 1. REACHモデルのロード (半径 -> 高度)
+    reach_path = "models/reach_model.pt"
+    reach_model = None
+    if os.path.exists(reach_path):
+        # クラス定義は冒頭に移動済み
+        reach_model = torch.load(reach_path, weights_only=False)
+        print("Loaded Reach Regressor.")
+
+    # 2. 環境の初期化 (REACHモデルを渡す)
+    env = RobotHandEnv(hw, reach_model=reach_model)
     
-    # モデルのロード
+    # 3. 把持ポリシーのロード (9次元)
+    policy = None
     if model_type == "bc":
-        path = "models/bc_policy.pt"
+        path = "models/bc_grasp_policy.pt"
         if not os.path.exists(path):
             print(f"Error: {path} not found.")
             return
         policy = torch.load(path, weights_only=False)
-        print("Using BC Policy.")
+        print("Using BC Grasp Policy (9D).")
     elif model_type == "rl_ppo":
         path = "models/ppo_finetuned_model.zip"
         if not os.path.exists(path):
@@ -49,34 +69,35 @@ def evaluate(model_type="bc"):
             return
         model = PPO.load(path, env=env)
         policy = model.policy
-        print("Using PPO Fine-tuned Policy.")
-    elif model_type == "rl_sac":
-        path = "models/sac_finetuned_model.zip"
-        if not os.path.exists(path):
-            print(f"Error: {path} not found.")
-            return
-        model = SAC.load(path, env=env)
-        policy = model.policy
-        print("Using SAC Fine-tuned Policy.")
+        print("Using PPO Fine-tuned Policy (9D).")
     else:
         print("Unknown model type.")
         return
 
-    print("\n--- Evaluation Start ---")
-    obs, _ = env.reset()
+    print("\n--- Evaluation Start (Hierarchical: Reach -> Grasp) ---")
+    obs, _ = env.reset() # ここで自動降下が行われる
     done = False
     total_reward = 0
     
     # 荷重統計用の記録リスト
     all_total_forces = []
-    all_sensor_forces = [] # [[f1, f2, f3], ...]
+    all_sensor_forces = [] 
     
     try:
         while not done:
-            # 推論
-            # 観測値は環境(env)側ですでに正しい10次元正規化済み
-            obs_tensor = torch.as_tensor(obs, dtype=torch.float32).unsqueeze(0)
+            # 観測値を把持専門の9次元に確実に変換
+            if len(obs) == 10:
+                # [Fz1, Fz2, Fz3, Z, Radius, A1-5] から Z(idx 3) を削除
+                obs_9d = np.concatenate([obs[0:3], obs[4:10]])
+            else:
+                obs_9d = obs
+
+            # 【デバッグ】AIへの入力を表示 (Fz*3, Radius, Angles*5)
+            print(f"\rAI Obs: Fz[{obs_9d[0]:.1f},{obs_9d[1]:.1f},{obs_9d[2]:.1f}] R:{obs_9d[3]:.2f} Angs:{obs_9d[4:9]}", end="")
+
+            obs_tensor = torch.as_tensor(obs_9d, dtype=torch.float32).unsqueeze(0)
             with torch.no_grad():
+                # 5次元(指のみ)のアクションを出力
                 action_tensor, _, _ = policy(obs_tensor)
             action = action_tensor.numpy()[0]
             
@@ -84,6 +105,10 @@ def evaluate(model_type="bc"):
             obs, reward, terminated, truncated, info = env.step(action)
             total_reward += reward
             done = terminated or truncated
+
+            # 【デバッグ】AIの予測アクションを表示 (+1.0が閉じ)
+            if info.get("step", 0) % 20 == 0:
+                print(f"\nAI Action Predict: {action} (Target: All +1.0)")
             
             # 荷重の記録 (infoから取得)
             total_f = info.get("total_force", 0.0)

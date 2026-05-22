@@ -27,7 +27,13 @@ def main():
         if choice == '1':
             os.system(f"{sys.executable} scripts/collect_data.py{args}")
         elif choice == '2':
-            os.system(f"{sys.executable} scripts/train_bc.py") 
+            print("\n>>> 模倣学習 (BC) のトレーニングを開始します...")
+            # 1. REACHフェーズの学習
+            os.system(f"{sys.executable} scripts/train_bc.py --phase reach")
+            # 2. GRASPフェーズの学習
+            os.system(f"{sys.executable} scripts/train_bc.py --phase grasp")
+            print("\n>>> 全フェーズのトレーニングが完了しました。")
+ 
         elif choice == '3':
             os.system(f"{sys.executable} scripts/train_rl.py{args}")
         elif choice == '4':

@@ -44,17 +44,17 @@ def dump_trajectory(filename):
             fz = obs[0:3]
             angles = obs[5:10]
         
-        # ActionのZ方向
-        act_z = acts[5]
+        # ActionのZ方向 (5次元の場合はN/A)
+        act_z_str = f"{acts[5]:7.2f}" if len(acts) > 5 else "  N/A  "
 
-        # 10ステップごとに区切り線（見やすくするため）
+        # 10ステップごとに区切り線
         if i > 0 and i % 10 == 0:
             print("-" * 115)
 
         # 指の角度 (AIが見ている正規化値) を整形
         ang_str = "[" + ", ".join([f"{a:4.1f}" for a in angles]) + "]"
         
-        print(f"{i:4d} | {z_mm:6.1f} | {fz[0]:5.1f} {fz[1]:5.1f} {fz[2]:5.1f} | {obs[3]:6.2f} | {ang_str:<35} | {act_z:7.2f}")
+        print(f"{i:4d} | {z_mm:6.1f} | {fz[0]:5.1f} {fz[1]:5.1f} {fz[2]:5.1f} | {obs[3]:6.2f} | {ang_str:<35} | {act_z_str}")
 
     print("-" * 115)
     print("Dump Complete.")

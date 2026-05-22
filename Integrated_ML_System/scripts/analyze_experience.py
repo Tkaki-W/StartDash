@@ -22,24 +22,25 @@ def analyze():
     if os.path.exists(data_dir):
         files = [f for f in os.listdir(data_dir) if f.endswith(".pkl")]
         for f in files:
-            # ファイル名から情報を抽出 (例: 4mm_hard_2026...)
+            # ファイル名から情報を抽出 (例: 4mm_hard_reach_2026...)
             parts = f.split('_')
             
-            if len(parts) >= 2:
-                # 最初の要素がサイズ(4mmなど)、二番目が硬さ(hardなど)
+            if len(parts) >= 3:
+                # 形式: [radius] [hardness] [phase] [timestamp]
                 label = f"{parts[0]} {parts[1]}"
+                phase_type = parts[2] # "reach" or "grasp"
+                category = f"{label} ({phase_type})"
             else:
-                label = "other format"
+                category = "other format"
             
-            expert_file_counts[label] += 1
+            expert_file_counts[category] += 1
             
             # ステップ数を計測
             try:
                 with open(os.path.join(data_dir, f), 'rb') as pkl:
                     traj = pickle.load(pkl)
-                    # データの形式（リストのリストか単一リストか）を判定
                     steps = len(traj[0]) if isinstance(traj[0], list) and len(traj) > 0 else len(traj)
-                    expert_step_counts[label] += steps
+                    expert_step_counts[category] += steps
             except:
                 pass
 
@@ -47,11 +48,11 @@ def analyze():
     if not expert_file_counts:
         print("  データが見つかりません。")
     else:
-        for label in sorted(expert_file_counts.keys()):
-            count = expert_file_counts[label]
-            total_steps = expert_step_counts[label]
+        for cat in sorted(expert_file_counts.keys()):
+            count = expert_file_counts[cat]
+            total_steps = expert_step_counts[cat]
             avg_steps = total_steps / count if count > 0 else 0
-            print(f"  - {label}: {count} 件 (平均 {int(avg_steps)} ステップ/件)")
+            print(f"  - {cat:<25}: {count:2d} 件 (平均 {int(avg_steps):3d} ステップ/件)")
 
     # 2. 強化学習履歴 (RL History) の集計
     rl_stats = defaultdict(lambda: {"episodes": 0, "successes": 0, "total_reward": 0.0})
