@@ -64,7 +64,7 @@ def collect():
         while True:
             current_time = time.time()
             # 1. センサーデータと「現在の状態(Observation)」を取得
-            # 手動で _latest_cnc_pos を上書きするのを止め、実際の状態を反映させる
+            # 物理的な読み戻し(update_cnc=True)はラグの原因になるため、内部保持値(False)を使う
             hw.update_sensor_data(update_cnc=False)
             obs = hw.get_observation()
             
@@ -145,7 +145,7 @@ def collect():
             # if moved:
             #     hw.wait_reach_z(target_pos[2])
             
-            hw.update_sensor_data(update_cnc=True)
+            hw.update_sensor_data(update_cnc=False)
             hw.print_mms_status()
             time.sleep(0.005) # ループ自体は高速(200Hz程度)にして操作感を滑らかにする
 

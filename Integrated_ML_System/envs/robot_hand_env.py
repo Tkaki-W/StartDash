@@ -26,7 +26,7 @@ class RobotHandEnv(gym.Env):
         self.start_xy = [0.0, 0.0]
         self.last_sent_z = None
         self.smoothed_action = None
-        self.alpha = 1 # 小さいほど滑らか (0.1~0.3推奨)
+        self.alpha = 0.9 # 小さいほど滑らか (0.1~0.3推奨。震えを抑えるために0.1に強化)
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)

@@ -21,39 +21,42 @@ def load_expert_data(data_path):
     for traj_data in trajectories_data:
         raw_obs = np.array([d["obs"] for d in traj_data], dtype=np.float32)
         raw_acts = np.array([d["acts"] for d in traj_data], dtype=np.float32)
-        
-        # 既存の16次元データから Fz (idx: 2, 5, 8) と CNC Z, Radius, Angles (idx: 9-15) を抽出して10次元に変換
+
+        # 既存の16次元データから10次元へ抽出・変換
         if raw_obs.shape[1] == 16:
-            obs_10d = np.concatenate([
-                raw_obs[:, [2, 5, 8]],  # MMS Fz x 3
-                raw_obs[:, 9:]           # CNC Z, Radius, Angles
-            ], axis=1)
-            
-            # --- 指の角度の正規化を「+1.0=閉」に統一する変換 ---
+            obs_10d = np.zeros((raw_obs.shape[0], 10), dtype=np.float32)
+
+            # 1. Fz のドリフトガード (プラスを0に)
+            obs_10d[:, 0:3] = np.minimum(0.0, raw_obs[:, [2, 5, 8]])
+
+            # 2. CNC Z の正規化 (raw Z=0.0 -> +1.0, Z=-32.0 -> -1.0)
+            obs_10d[:, 3] = (raw_obs[:, 9] / 16.0) + 1.0
+
+            # 3. ボール半径の正規化 (10mmを1.0とする)
+            obs_10d[:, 4] = raw_obs[:, 10] / 10.0
+
+            # 4. 指の角度の正規化を「+1.0=閉」に統一
             # 旧データの正規化: old_norm = (angle - 90) / 80.0
-            
-            # 親指 (obs idx 5): 中心95, スケール75 に微調整
-            # new = ( (old * 80 + 90) - 95 ) / 75
-            obs_10d[:, 5] = (raw_obs[:, 11] * 80.0 - 5.0) / 75.0
-            
-            # 他の指 (obs idx 6-9): 逆転させ、中心100に合わせてシフト
-            # new = -( (old * 80 + 90) - 100 ) / 80 = -old + 0.125
+            # 親指 (idx 5): 中心95, スケール75 
+            obs_10d[:, 5] = ( (raw_obs[:, 11] * 80.0 + 90.0) - 95.0 ) / 75.0
+            # 他の指 (idx 6-9): 中心100, 反転, スケール80
             for i in range(1, 5):
-                obs_10d[:, 5 + i] = -raw_obs[:, 11 + i] + 0.125
-            
+                obs_10d[:, 5 + i] = -( (raw_obs[:, 11 + i] * 80.0 + 90.0) - 100.0 ) / 80.0
+
             obs = obs_10d
-            
+
             # 出力(acts)も同様に修正 (acts idx 0-4)
             acts = raw_acts.copy()
             # 親指 (idx 0)
-            acts[:, 0] = (raw_acts[:, 0] * 80.0 - 5.0) / 75.0
+            acts[:, 0] = ( (raw_acts[:, 0] * 80.0 + 90.0) - 95.0 ) / 75.0
             # 他の指 (idx 1-4)
-            acts[:, 1:5] = -raw_acts[:, 1:5] + 0.125
+            acts[:, 1:5] = -( (raw_acts[:, 1:5] * 80.0 + 90.0) - 100.0 ) / 80.0
         else:
             obs = raw_obs
             acts = raw_acts
 
-        # 最後の観測値を補完 (Trajectoryの仕様上、len(obs) == len(acts) + 1 が必要)
+        # 最後の観測値を補完
+
 
         final_obs = obs[-1:]
         obs = np.concatenate([obs, final_obs], axis=0)

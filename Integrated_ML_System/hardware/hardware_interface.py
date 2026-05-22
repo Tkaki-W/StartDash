@@ -182,24 +182,25 @@ class HardwareInterface:
 
     def get_observation(self):
         with self.lock:
-            # 各指の正規化を統一する (+1.0 = 閉じ, -1.0 = 開き)
-            # ハードウェア設定に基づく中心点: 親指=95, 他=100
+            # 各指の正規化を統一 (+1.0=閉, -1.0=開)
             raw_angles = np.array(self._latest_slave_angles)
             norm_angles = np.zeros(5, dtype=np.float32)
-            
-            # 親指 (idx 0): 170(閉) -> +1.0, 20(開) -> -1.0
             norm_angles[0] = (raw_angles[0] - 95.0) / 75.0
-            
-            # 他の指 (idx 1-4): 20(閉) -> +1.0, 180(開) -> -1.0
             norm_angles[1:] = -(raw_angles[1:] - 100.0) / 80.0
 
-            # Fz (垂直荷重) だけを抽出
+            # CNC Z の正規化 (0.0mm -> +1.0, -32.0mm -> -1.0)
+            norm_z = (self._latest_cnc_pos[2] / 16.0) + 1.0
+            norm_z = np.clip(norm_z, -1.0, 1.0)
+
+            # MMS Fz の取得とドリフトガード (プラス方向は0固定、かつ -0.1N 未満の微細なノイズもカット)
+            fz1 = self._latest_mms_data[2] if self._latest_mms_data[2] < -0.1 else 0.0
+            fz2 = self._latest_mms2_data[2] if self._latest_mms2_data[2] < -0.1 else 0.0
+            fz3 = self._latest_mms3_data[2] if self._latest_mms3_data[2] < -0.1 else 0.0
+
             return np.concatenate([
-                [self._latest_mms_data[2]], 
-                [self._latest_mms2_data[2]],
-                [self._latest_mms3_data[2]],
-                [self._latest_cnc_pos[2]], 
-                [self.ball_radius], 
+                [fz1], [fz2], [fz3],
+                [norm_z], 
+                [self.ball_radius / 10.0], # 半径もスケールを合わせる(3mmなら0.3)
                 norm_angles
             ]).astype(np.float32)
 

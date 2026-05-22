@@ -74,16 +74,8 @@ def evaluate(model_type="bc"):
     try:
         while not done:
             # 推論
-            # 念のため、ここで観測値を10次元に確実に変換する (Fz x 3 + Z + Radius + Angles x 5)
-            if len(obs) == 16:
-                obs_10d = np.concatenate([
-                    obs[[2, 5, 8]], # Fz values
-                    obs[9:]          # CNC Z, Radius, Angles
-                ])
-            else:
-                obs_10d = obs
-
-            obs_tensor = torch.as_tensor(obs_10d, dtype=torch.float32).unsqueeze(0)
+            # 観測値は環境(env)側ですでに正しい10次元正規化済み
+            obs_tensor = torch.as_tensor(obs, dtype=torch.float32).unsqueeze(0)
             with torch.no_grad():
                 action_tensor, _, _ = policy(obs_tensor)
             action = action_tensor.numpy()[0]
