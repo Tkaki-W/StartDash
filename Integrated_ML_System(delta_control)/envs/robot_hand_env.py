@@ -70,20 +70,28 @@ class RobotHandEnv(gym.Env):
     def step(self, action):
         self.current_step += 1
         
-        # 1. AIのアクションをスムージング (EMA)
-        if self.smoothed_action is not None:
-            self.smoothed_action = self.alpha * action + (1 - self.alpha) * self.smoothed_action
-        else:
-            self.smoothed_action = action
+        # 1. AIのアクション(Delta)をスケーリング
+        # action [-1, 1] を角度変化 [-5, 5] 度程度にマッピング
+        max_delta = 5.0
+        delta_angles = action * max_delta
+
+        # 2. 現在の角度を取得してDeltaを加算
+        # obsから現在の角度(インデックス4-8)を取得
+        current_obs = self.hw.get_observation()
+        current_angles_norm = current_obs[4:9]
         
-        # 2. 値の分解 (AIの出力: +1.0 = 閉じ, -1.0 = 開き に統一)
-        hand_angles = np.zeros(5, dtype=int)
-        hand_angles[0] = int(self.smoothed_action[0] * 75.0 + 95.0) # 親指
-        hand_angles[1:] = (100.0 - (self.smoothed_action[1:5] * 80.0)).astype(int) # 他
-        hand_angles = np.clip(hand_angles, 10, 175)
+        # 正規化された角度から実際の角度(度)に一度戻す
+        # (train_bc.py や collect_data.py の正規化逆算)
+        current_angles = np.zeros(5)
+        current_angles[0] = current_angles_norm[0] * 75.0 + 95.0
+        current_angles[1:] = 100.0 - (current_angles_norm[1:] * 80.0)
+
+        # Deltaを加算して新しい目標角度を計算
+        target_angles = current_angles + delta_angles
+        target_angles = np.clip(target_angles, 10, 175).astype(int)
         
-        # 3. ハードウェアへの指令 (Zは固定)
-        self.hw.move_hand(hand_angles)
+        # 3. ハードウェアへの指令
+        self.hw.move_hand(target_angles)
         
         # 4. 観測値の生成
         self.hw.update_sensor_data(update_cnc=False)
