@@ -20,7 +20,7 @@ class RobotHandEnv(gym.Env):
         self.target_z = 0.0 # REACHモデルで決定される目的地
         
         # 試行の設定
-        self.max_steps = 500 
+        self.max_steps = 300 
         self.current_step = 0
         
         # 内部状態
@@ -104,7 +104,7 @@ class RobotHandEnv(gym.Env):
 
         # 荷重ペナルティ (強すぎる力を厳しく抑制)
         total_force = sum([abs(fz) for fz in self.hw.last_fz_values])
-        force_penalty = total_force * 0.4 
+        force_penalty = total_force * 0.0001 
         reward -= force_penalty
 
         self.episode_forces.append(total_force)

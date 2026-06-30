@@ -70,6 +70,21 @@ def evaluate(model_type="bc"):
         model = PPO.load(path, env=env)
         policy = model.policy
         print("Using PPO Fine-tuned Policy (9D).")
+    elif model_type == "rl_sac":
+        path = "models/sac_finetuned_model.zip"
+        if not os.path.exists(path):
+            # .zip 拡張子がない可能性も考慮
+            path_no_ext = "models/sac_finetuned_model"
+            if os.path.exists(path_no_ext + ".zip"):
+                path = path_no_ext + ".zip"
+            elif os.path.exists(path_no_ext):
+                path = path_no_ext
+            else:
+                print(f"Error: {path} not found.")
+                return
+        model = SAC.load(path, env=env)
+        policy = model.policy
+        print("Using SAC Fine-tuned Policy (9D).")
     else:
         print("Unknown model type.")
         return
@@ -95,11 +110,8 @@ def evaluate(model_type="bc"):
             # 【デバッグ】AIへの入力を表示 (Fz*3, Radius, Angles*5)
             print(f"\rAI Obs: Fz[{obs_9d[0]:.1f},{obs_9d[1]:.1f},{obs_9d[2]:.1f}] R:{obs_9d[3]:.2f} Angs:{obs_9d[4:9]}", end="")
 
-            obs_tensor = torch.as_tensor(obs_9d, dtype=torch.float32).unsqueeze(0)
-            with torch.no_grad():
-                # 5次元(指のみ)のアクションを出力
-                action_tensor, _, _ = policy(obs_tensor)
-            action = action_tensor.numpy()[0]
+            # 確定的なアクションを取得 (評価のため deterministic=True に設定)
+            action, _ = policy.predict(obs_9d, deterministic=True)
             
             # 実行
             obs, reward, terminated, truncated, info = env.step(action)
