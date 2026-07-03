@@ -20,7 +20,7 @@ class RobotHandEnv(gym.Env):
         self.target_z = 0.0 # REACHモデルで決定される目的地
         
         # 試行の設定
-        self.max_steps = 300 
+        self.max_steps = 100 
         self.current_step = 0
         
         # 内部状態
