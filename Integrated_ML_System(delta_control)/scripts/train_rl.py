@@ -12,16 +12,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from hardware.hardware_interface import HardwareInterface
 from envs.robot_hand_env import RobotHandEnv
-
-# REACHモデルの設計図 (ロードに必要)
-class ReachRegressor(torch.nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.net = torch.nn.Sequential(
-            torch.nn.Linear(1, 16), torch.nn.ReLU(),
-            torch.nn.Linear(16, 1)
-        )
-    def forward(self, x): return self.net(x)
+from scripts.train_bc import ReachRegressor
 
 def train():
     parser = argparse.ArgumentParser()

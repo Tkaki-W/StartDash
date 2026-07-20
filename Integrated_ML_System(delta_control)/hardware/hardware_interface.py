@@ -30,6 +30,7 @@ except ImportError:
 
 
 #mms1,2,3がそれぞれ親指、薬指、人差し指に対応しちゃってるので気を付けてね( ；∀；)(学習モデルを一からつくる際は気にしなくていいと思うけど)
+#今回はCOM15が親指,COM14が人差し指
 class HardwareInterface:
     def __init__(self, master_port="COM5", slave_port="COM4", cnc_port="COM6", mms_port="COM9", mms2_port="COM14", mms3_port="COM15", dummy_mode=False):
         self.master_port = master_port

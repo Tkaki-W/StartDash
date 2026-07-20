@@ -25,17 +25,13 @@ class RobotHandEnv(gym.Env):
         
         # 内部状態
         self.start_xy = [0.0, 0.0]
-        self.smoothed_action = None
-        self.alpha = 0.6# 1.0 に戻してAIの出力をダイレクトに反映させる
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.current_step = 0
-        self.smoothed_action = np.zeros(5)
         
         # 統計リセット
         self.episode_forces = []
-        self.episode_penalties = 0.0
         
         # 現在のX,Y位置を取得して保持
         pos, _ = self.hw.cnc.get_current_pos()

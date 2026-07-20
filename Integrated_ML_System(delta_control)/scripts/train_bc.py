@@ -18,43 +18,30 @@ def load_expert_data(data_path):
         
     trajectories = []
     for traj_data in trajectories_data:
-        # raw_obs: [Fz1, Fz2, Fz3, Temp, Radius, Ang1, Ang2, Ang3, Ang4, Ang5] (10次元)
+        # raw_obs: [Fz1, Fz2, Fz3, Radius, Ang1, Ang2, Ang3, Ang4, Ang5] (9次元)
         raw_obs = np.array([d["obs"] for d in traj_data], dtype=np.float32)
         # raw_acts: [Ang1, Ang2, Ang3, Ang4, Ang5] (正規化済み)
         raw_acts = np.array([d["acts"] for d in traj_data], dtype=np.float32)
         
-        if raw_obs.shape[1] != 10:
+        if raw_obs.shape[1] != 9:
             continue
-            
-        # [Fz1, Fz2, Fz3, Radius, Ang1, Ang2, Ang3, Ang4, Ang5] (9次元)
-        obs_9d = np.concatenate([raw_obs[:, 0:3], raw_obs[:, 4:10]], axis=1)
 
-        # --- Delta Control への変換 ---
-        # 角度(度)に変換
-        angles_deg = np.zeros_like(raw_acts)
-        angles_deg[:, 0] = raw_acts[:, 0] * 75.0 + 95.0
-        angles_deg[:, 1:] = 100.0 - (raw_acts[:, 1:] * 80.0)
+        # --- Delta Control への変換 (正規化を一回のみ) ---
+        raw_deltas = np.diff(raw_acts, axis=0)
+        raw_deltas = np.concatenate([raw_deltas, np.zeros((1, 5))], axis=0)
         
-        # ステップ間の差分を計算 (t+1 - t)
-        # 最後のステップの差分は0とする
-        deltas = np.diff(angles_deg, axis=0)
-        deltas = np.concatenate([deltas, np.zeros((1, 5))], axis=0)
-        
-        # 環境と同じスケール (max_delta=5.0) で正規化
-        max_delta = 5.0
-        norm_deltas = np.clip(deltas / max_delta, -1.0, 1.0)
-
-        # フィルタリングを廃止し、接近から把持まで全てのステップを学習対象にする
-        obs_filtered = obs_9d
-        acts_filtered = norm_deltas
+        norm_deltas = np.zeros_like(raw_deltas)
+        norm_deltas[:, 0] = raw_deltas[:, 0] * (75.0 / 5.0)       # 親指: (Δa * 75.0) / 5.0
+        norm_deltas[:, 1:] = raw_deltas[:, 1:] * -(80.0 / 5.0)    # その他: (-Δa * 80.0) / 5.0
+        norm_deltas = np.clip(norm_deltas, -1.0, 1.0)
 
         # Trajectory作成
-        if len(acts_filtered) < 2: continue
+        if len(norm_deltas) < 2: continue
         # Trajectoryクラスの仕様に合わせて、obsの末尾にダミー（最後と同じ状態）を1つ足す
-        final_obs = obs_filtered[-1:]
-        obs_aug = np.concatenate([obs_filtered, final_obs], axis=0)
-        infos = [{} for _ in range(len(acts_filtered))]
-        trajectories.append(types.Trajectory(obs=obs_aug, acts=acts_filtered, infos=infos, terminal=True))
+        final_obs = raw_obs[-1:]
+        obs_aug = np.concatenate([raw_obs, final_obs], axis=0)
+        infos = [{} for _ in range(len(norm_deltas))]
+        trajectories.append(types.Trajectory(obs=obs_aug, acts=norm_deltas, infos=infos, terminal=True))
     
     return trajectories
 
@@ -84,8 +71,12 @@ def train():
         for f in files:
             try:
                 with open(f, 'rb') as pkl:
-                    traj = pickle.load(pkl); obs = traj[0]["obs"]
-                    if len(obs) == 1: X.append([obs[0]]); Y.append([traj[-1]["acts"][0]])
+                    traj = pickle.load(pkl)
+                    reach_traj = traj[0]
+                    obs = reach_traj[0]["obs"]
+                    if len(obs) == 1:
+                        X.append([obs[0]])
+                        Y.append([reach_traj[-1]["acts"][0]])
             except: continue
         if not X: return
         model = ReachRegressor(); optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
@@ -100,7 +91,7 @@ def train():
         all_trajectories = []
         for f in files: all_trajectories.extend(load_expert_data(f))
         if not all_trajectories:
-            print("Error: No stable contact found in data files.")
+            print("Error: No trajectory loaded from data files.")
             return
             
         transitions = rollout.flatten_trajectories(all_trajectories)
