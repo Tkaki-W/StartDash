@@ -14,7 +14,7 @@ except ImportError as e:
     sys.exit(1)
 
 def main():
-    PORT = "COM9"
+    PORT = "COM7"
     OUTPUT_6AXIS = True 
     
     print(f"Initializing MMS101 on {PORT}...")
