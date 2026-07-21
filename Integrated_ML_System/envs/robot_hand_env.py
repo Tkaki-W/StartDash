@@ -26,7 +26,7 @@ class RobotHandEnv(gym.Env):
         # 内部状態
         self.start_xy = [0.0, 0.0]
         self.smoothed_action = None
-        self.alpha = 0.6# 1.0 に戻してAIの出力をダイレクトに反映させる
+        self.alpha = 1# 1.0 に戻してAIの出力をダイレクトに反映させる
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)

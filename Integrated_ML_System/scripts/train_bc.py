@@ -27,27 +27,15 @@ def load_expert_data(data_path):
         # [Fz1, Fz2, Fz3, Radius, Ang1, Ang2, Ang3, Ang4, Ang5]
         obs_9d = np.concatenate([raw_obs[:, 0:3], raw_obs[:, 4:10]], axis=1)
 
-        # --- 触覚・角度マッピング (Tactile-to-Angle Mapping) ---
-        # 実際に力がかかっているステップ（-0.3N以下）のみを抽出
-        fz_values = raw_obs[:, 0:3]
-        has_contact = np.any(fz_values <= -0.2, axis=1)
-        
-        if not np.any(has_contact):
-            continue
-            
-        obs_filtered = obs_9d[has_contact]
-        
-        # 正解ラベルとして「その試行で最後に到達した安定した角度」を採用
-        # これにより、AIは「感触があったらこの角度まで動かして止まる」ことを学ぶ
-        final_stable_action = raw_acts[-1, 0:5]
-        acts_filtered = np.tile(final_stable_action, (len(obs_filtered), 1))
+        # アクション (5次元の角度)
+        acts_5d = raw_acts[:, 0:5]
 
-        # Trajectory作成
-        if len(acts_filtered) < 2: continue
-        final_obs = obs_filtered[-1:]
-        obs_aug = np.concatenate([obs_filtered, final_obs], axis=0)
-        infos = [{} for _ in range(len(acts_filtered))]
-        trajectories.append(types.Trajectory(obs=obs_aug, acts=acts_filtered, infos=infos, terminal=True))
+        # Trajectory作成 (フィルタリングなし、全ステップを使用)
+        if len(acts_5d) < 2: continue
+        final_obs = obs_9d[-1:]
+        obs_aug = np.concatenate([obs_9d, final_obs], axis=0)
+        infos = [{} for _ in range(len(acts_5d))]
+        trajectories.append(types.Trajectory(obs=obs_aug, acts=acts_5d, infos=infos, terminal=True))
     
     return trajectories
 
