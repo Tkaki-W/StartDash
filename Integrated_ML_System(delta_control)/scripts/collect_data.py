@@ -25,15 +25,15 @@ def collect():
         return
 
     try:
-        radius = float(input("ボールの半径(mm): "))
+        radius = float(input("物体のサイズ(mm): "))
         hw.ball_radius = radius
-    except: 
+    except:
         radius = 0.0
         hw.ball_radius = 0.0
 
-    hardness = input("ボールの硬さ (soft / hard): ").lower()
-    if hardness not in ['soft', 'hard']:
-        hardness = "unknown"
+    shape = input("物体の形状 (ball / cube): ").lower()
+    if shape not in ['ball', 'cube']:
+        shape = "unknown"
 
     # Negative=Down 座標系でのホーム設定
     home_z = 0.0
@@ -93,7 +93,7 @@ def collect():
                         hw.wait_cnc()
                         success = hw.auto_lift(15.0)
                         if success:
-                            save_dual_data(reach_traj, grasp_traj, radius, hardness)
+                            save_dual_data(reach_traj, grasp_traj, radius, shape)
                         else:
                             print("Lift Failed. Data discarded.")
                         phase = 0
@@ -143,12 +143,12 @@ def collect():
         hw.disconnect()
         print("\nCollection session ended.")
 
-def save_dual_data(reach_traj, grasp_traj, radius, hardness):
+def save_dual_data(reach_traj, grasp_traj, radius, shape):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     os.makedirs("data", exist_ok=True)
-    
-    reach_file = f"data/{int(radius)}mm_{hardness}_reach_{timestamp}.pkl"
-    grasp_file = f"data/{int(radius)}mm_{hardness}_grasp_{timestamp}.pkl"
+
+    reach_file = f"data/{int(radius)}mm_{shape}_reach_{timestamp}.pkl"
+    grasp_file = f"data/{int(radius)}mm_{shape}_grasp_{timestamp}.pkl"
     
     with open(reach_file, 'wb') as f: pickle.dump([reach_traj], f)
     with open(grasp_file, 'wb') as f: pickle.dump([grasp_traj], f)

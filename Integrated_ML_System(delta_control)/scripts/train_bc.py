@@ -56,14 +56,24 @@ def train():
     parser = argparse.ArgumentParser()
     parser.add_argument("--phase", choices=["reach", "grasp"], default="grasp")
     args = parser.parse_args()
-    
+
+    # 形状の選択
+    shape = input("学習する物体の形状 (ball / cube): ").lower()
+    if shape not in ['ball', 'cube']:
+        print("Error: 'ball' または 'cube' を入力してください。")
+        return
+
     phase = args.phase
     script_dir = os.path.dirname(os.path.abspath(__file__))
     base_dir = os.path.dirname(script_dir)
     data_dir = os.path.join(base_dir, "data")
-    
-    files = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.endswith(".pkl") and f"_{phase}_" in f]
-    if not files: return
+
+    # 指定された形状のファイルのみを読み込む
+    files = [os.path.join(data_dir, f) for f in os.listdir(data_dir)
+             if f.endswith(".pkl") and f"_{phase}_" in f and f"_{shape}_" in f]
+    if not files:
+        print(f"Error: {shape}の{phase}データが見つかりません。")
+        return
 
     if phase == "reach":
         print(f"--- Training Reach Regressor ---")
@@ -84,8 +94,9 @@ def train():
         for epoch in range(1001):
             optimizer.zero_grad(); loss = criterion(model(X_t), Y_t); loss.backward(); optimizer.step()
         os.makedirs(os.path.join(base_dir, "models"), exist_ok=True)
-        torch.save(model, os.path.join(base_dir, "models", "reach_model.pt"))
-        print("Reach model saved.")
+        model_path = os.path.join(base_dir, "models", f"reach_model_{shape}.pt")
+        torch.save(model, model_path)
+        print(f"Reach model saved to {model_path}")
     else:
         print(f"--- Training Grasp Expert (Tactile-to-Angle Mode) ---")
         all_trajectories = []
@@ -111,8 +122,9 @@ def train():
         )
         bc_trainer.train(n_epochs=500)
         os.makedirs(os.path.join(base_dir, "models"), exist_ok=True)
-        torch.save(bc_trainer.policy, os.path.join(base_dir, "models", "bc_grasp_policy.pt"))
-        print("Grasp model saved.")
+        model_path = os.path.join(base_dir, "models", f"bc_grasp_policy_{shape}.pt")
+        torch.save(bc_trainer.policy, model_path)
+        print(f"Grasp model saved to {model_path}")
 
 if __name__ == "__main__":
     train()

@@ -37,18 +37,26 @@ def evaluate(model_type="bc"):
         return
 
     try:
-        radius = float(input("評価するボールの半径(mm)を入力してください: "))
+        radius = float(input("評価する物体のサイズ(mm)を入力してください: "))
         hw.ball_radius = radius
     except ValueError:
         hw.ball_radius = 0.0
 
+    shape = input("物体の形状 (ball / cube): ").lower()
+    if shape not in ['ball', 'cube']:
+        print("Error: 'ball' または 'cube' を入力してください。")
+        hw.disconnect()
+        return
+
     # 1. REACHモデルのロード (半径 -> 高度)
-    reach_path = "models/reach_model.pt"
+    reach_path = f"models/reach_model_{shape}.pt"
     reach_model = None
     if os.path.exists(reach_path):
         # クラス定義は冒頭に移動済み
         reach_model = torch.load(reach_path, weights_only=False)
-        print("Loaded Reach Regressor.")
+        print(f"Loaded Reach Regressor for {shape}.")
+    else:
+        print(f"Warning: {reach_path} not found. Using default reach height.")
 
     # 2. 環境の初期化 (REACHモデルを渡す)
     env = RobotHandEnv(hw, reach_model=reach_model)
@@ -56,37 +64,41 @@ def evaluate(model_type="bc"):
     # 3. 把持ポリシーのロード (9次元)
     policy = None
     if model_type == "bc":
-        path = "models/bc_grasp_policy.pt"
+        path = f"models/bc_grasp_policy_{shape}.pt"
         if not os.path.exists(path):
             print(f"Error: {path} not found.")
+            hw.disconnect()
             return
         policy = torch.load(path, weights_only=False)
-        print("Using BC Grasp Policy (9D).")
+        print(f"Using BC Grasp Policy for {shape} (9D).")
     elif model_type == "rl_ppo":
-        path = "models/ppo_finetuned_model.zip"
+        path = f"models/ppo_finetuned_model_{shape}.zip"
         if not os.path.exists(path):
             print(f"Error: {path} not found.")
+            hw.disconnect()
             return
         model = PPO.load(path, env=env)
         policy = model.policy
-        print("Using PPO Fine-tuned Policy (9D).")
+        print(f"Using PPO Fine-tuned Policy for {shape} (9D).")
     elif model_type == "rl_sac":
-        path = "models/sac_finetuned_model.zip"
+        path = f"models/sac_finetuned_model_{shape}.zip"
         if not os.path.exists(path):
             # .zip 拡張子がない可能性も考慮
-            path_no_ext = "models/sac_finetuned_model"
+            path_no_ext = f"models/sac_finetuned_model_{shape}"
             if os.path.exists(path_no_ext + ".zip"):
                 path = path_no_ext + ".zip"
             elif os.path.exists(path_no_ext):
                 path = path_no_ext
             else:
                 print(f"Error: {path} not found.")
+                hw.disconnect()
                 return
         model = SAC.load(path, env=env)
         policy = model.policy
-        print("Using SAC Fine-tuned Policy (9D).")
+        print(f"Using SAC Fine-tuned Policy for {shape} (9D).")
     else:
         print("Unknown model type.")
+        hw.disconnect()
         return
 
     print("\n--- Evaluation Start (Hierarchical: Reach -> Grasp) ---")
