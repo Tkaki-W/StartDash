@@ -58,9 +58,9 @@ def train():
     args = parser.parse_args()
 
     # 形状の選択
-    shape = input("学習する物体の形状 (ball / cube): ").lower()
-    if shape not in ['ball', 'cube']:
-        print("Error: 'ball' または 'cube' を入力してください。")
+    shape = input("学習する物体の形状 (ball / cube / mix): ").lower()
+    if shape not in ['ball', 'cube', 'mix']:
+        print("Error: 'ball', 'cube', または 'mix' を入力してください。")
         return
 
     phase = args.phase
@@ -68,9 +68,19 @@ def train():
     base_dir = os.path.dirname(script_dir)
     data_dir = os.path.join(base_dir, "data")
 
-    # 指定された形状のファイルのみを読み込む
-    files = [os.path.join(data_dir, f) for f in os.listdir(data_dir)
-             if f.endswith(".pkl") and f"_{phase}_" in f and f"_{shape}_" in f]
+    # 指定された形状のファイルを読み込む
+    if shape == "mix":
+        # ball と cube 両方のデータを読み込む
+        files_ball = [os.path.join(data_dir, f) for f in os.listdir(data_dir)
+                      if f.endswith(".pkl") and f"_{phase}_" in f and f"_ball_" in f]
+        files_cube = [os.path.join(data_dir, f) for f in os.listdir(data_dir)
+                      if f.endswith(".pkl") and f"_{phase}_" in f and f"_cube_" in f]
+        files = files_ball + files_cube
+        print(f"Loading {len(files_ball)} ball files + {len(files_cube)} cube files = {len(files)} total files")
+    else:
+        files = [os.path.join(data_dir, f) for f in os.listdir(data_dir)
+                 if f.endswith(".pkl") and f"_{phase}_" in f and f"_{shape}_" in f]
+
     if not files:
         print(f"Error: {shape}の{phase}データが見つかりません。")
         return

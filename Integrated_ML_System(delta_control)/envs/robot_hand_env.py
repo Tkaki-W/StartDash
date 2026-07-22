@@ -18,9 +18,9 @@ class RobotHandEnv(gym.Env):
         self.cnc_min_z = -32.0
         self.cnc_max_z = 0.0
         self.target_z = 0.0 # REACHモデルで決定される目的地
-        
+
         # 試行の設定
-        self.max_steps = 100 
+        self.max_steps = 100
         self.current_step = 0
         
         # 内部状態

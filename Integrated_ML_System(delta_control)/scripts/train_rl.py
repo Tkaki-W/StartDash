@@ -17,6 +17,10 @@ from scripts.train_bc import ReachRegressor
 def train():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dummy", action="store_true")
+    parser.add_argument("--timesteps", type=int, default=10000, help="学習の総ステップ数")
+    parser.add_argument("--n-steps", type=int, default=1024, help="PPOの1更新あたりのロールアウトステップ数")
+    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--lr", type=float, default=1e-4, help="学習率")
     args = parser.parse_args()
 
     hw = HardwareInterface(dummy_mode=args.dummy)
@@ -28,9 +32,9 @@ def train():
     except ValueError:
         radius = 0.0; hw.ball_radius = 0.0
 
-    shape = input("物体の形状 (ball / cube): ").lower()
-    if shape not in ['ball', 'cube']:
-        print("Error: 'ball' または 'cube' を入力してください。")
+    shape = input("物体の形状 (ball / cube / mix): ").lower()
+    if shape not in ['ball', 'cube', 'mix']:
+        print("Error: 'ball', 'cube', または 'mix' を入力してください。")
         hw.disconnect()
         return
 
@@ -53,11 +57,11 @@ def train():
 
     if os.path.exists(rl_model_path):
         print(f"Loading existing RL model from {rl_model_path}...")
-        model = PPO.load(rl_model_path, env=env, learning_rate=1e-4)
+        model = PPO.load(rl_model_path, env=env, learning_rate=args.lr)
     else:
         print("No existing RL model found. Initializing from BC...")
-        model = PPO("MlpPolicy", env, verbose=1, learning_rate=1e-4, 
-                    n_steps=1024, batch_size=64, policy_kwargs=policy_kwargs)
+        model = PPO("MlpPolicy", env, verbose=1, learning_rate=args.lr,
+                    n_steps=args.n_steps, batch_size=args.batch_size, policy_kwargs=policy_kwargs)
 
         if os.path.exists(bc_policy_path):
             bc_policy = torch.load(bc_policy_path, weights_only=False)
@@ -102,7 +106,7 @@ def train():
 
     print(f"--- RL Fine-tuning Start ---")
     try:
-        model.learn(total_timesteps=10000, callback=SaveAndLogCallback(rl_model_path, radius, shape))
+        model.learn(total_timesteps=args.timesteps, callback=SaveAndLogCallback(rl_model_path, radius, shape))
     except KeyboardInterrupt:
         print("Interrupted.")
     
