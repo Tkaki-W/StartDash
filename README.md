@@ -61,6 +61,9 @@ flowchart LR
 
 <!-- 📷 画像: アーキテクチャ図（スライド「アーキテクチャの変更」） -->
 <p align="center">
+  <img width="400" alt="スクリーンショット_3-10-2026_123537_" src="https://github.com/user-attachments/assets/fe7b8dff-4c84-41e0-b3fc-c2a12d81a2aa" />
+</p>
+<p align="center">
   <img width="805" height="326" alt="スクリーンショット 2026-10-03 123402" src="https://github.com/user-attachments/assets/a6fbe91b-e8ce-41fd-a50f-c63366f9bedd" />
 
 </p>
