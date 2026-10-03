@@ -3,9 +3,9 @@
 **模倣学習 (BC) → 強化学習 (PPO) によるファインチューン**で、大きさや形の違う物体を自動で把持する5本指ロボットハンドのシステムです。
 人がマスター手袋で操作したデータから学習し、実機上の強化学習で「把持成功」と「かける力の小ささ」を両立するように調整します。
 
-<!-- 📷 画像: 実機全体の写真（ロボットハンド + CNCステージ + 触覚センサ） -->
+<!-- 📷 画像: 実験環境の全体（マスター手袋 + スレーブハンド + CNCステージ + 触覚センサ + PC） -->
 <p align="center">
-  <img src="assets/system_overview.jpg" width="600" alt="システム全体">
+  <img src="assets/environment.jpg" width="700" alt="実験環境">
 </p>
 
 ## ポイント
@@ -81,11 +81,9 @@ flowchart LR
 | 模倣学習のみ | 10/10 | 10/10 | 10/10 | 10/10 |
 | 模倣 + 強化学習 | 10/10 | 10/10 | 10/10 | 10/10 |
 
-<!-- 📷 画像: 把持の様子（模倣学習 / 強化学習 を横並び） -->
-<p align="center">
-  <img src="assets/grasp_bc.jpg" width="45%" alt="模倣学習">
-  <img src="assets/grasp_rl.jpg" width="45%" alt="強化学習">
-</p>
+<!-- 🎬 動画: 把持の様子。GitHubの編集画面に動画ファイルをドラッグ&ドロップすると
+     https://github.com/user-attachments/assets/xxxx の形のURLが入るので、下の行と置き換える -->
+https://github.com/user-attachments/assets/REPLACE_WITH_VIDEO_ID
 
 ## 動かし方
 
