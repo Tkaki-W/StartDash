@@ -93,8 +93,12 @@ flowchart LR
 
 教師データにない直径5cmの球や、置く向きで持ち方が変わる立方体も、触覚をもとに指を少しずつ閉じてつかみ、持ち上げられました。
 
-<!-- 🎬 ここに動画のURLを貼る（GitHubの編集画面に動画をドラッグ&ドロップするとURLが入る） -->
-https://github.com/user-attachments/assets/REPLACE_WITH_VIDEO_ID
+<p align="center">
+  <a href=https://youtu.be/mk3GkpD1y4Q">
+    <img width="876" height="508" alt="スクリーンショット 2026-10-03 130118" src="https://github.com/user-attachments/assets/e11089d9-53b2-4039-936c-5c2638ec01d5" />
+  </a>
+  <h4>↑クリックして再生↑</h4>
+</p>
 
 ## 動かし方
 
