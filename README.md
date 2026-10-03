@@ -5,7 +5,8 @@
 
 <!-- 📷 画像: 実験環境の全体（マスター手袋 + スレーブハンド + CNCステージ + 触覚センサ + PC） -->
 <p align="center">
-  <img src="assets/environment.jpg" width="700" alt="実験環境">
+  <img width="653" height="265" alt="スクリーンショット 2026-10-03 122743" src="https://github.com/user-attachments/assets/06197cc4-cca6-465d-91a6-261b3fc9199f" />
+
 </p>
 
 ## 動作の流れ
