@@ -61,7 +61,8 @@ flowchart LR
 
 <!-- 📷 画像: アーキテクチャ図（スライド「アーキテクチャの変更」） -->
 <p align="center">
-  <img src="assets/architecture.png" width="600" alt="アーキテクチャ">
+  <img width="805" height="326" alt="スクリーンショット 2026-10-03 123402" src="https://github.com/user-attachments/assets/a6fbe91b-e8ce-41fd-a50f-c63366f9bedd" />
+
 </p>
 
 | | 入力 (観測) | 出力 (行動) |
