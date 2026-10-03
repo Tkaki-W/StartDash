@@ -73,8 +73,8 @@ flowchart LR
 | | REACH 回帰 | GRASP 模倣学習 | GRASP 強化学習 |
 |---|---|---|---|
 | アルゴリズム | MLP回帰 (PyTorch) | Behavior Cloning (`imitation`) | PPO (`stable-baselines3`) |
-| ネットワーク | 1 → 16 → 1 (ReLU) | pi / vf: [32, 32] | pi / vf: [32, 32]（BCから初期化） |
-| 学習率 | 0.01 (Adam) | 1e-3 | 1e-4 |
+| ネットワーク | 1 →16→1| [32, 32] | [32, 32]（BCから初期化） |
+| 学習率 | 0.01| 1e-3 | 1e-4 |
 | バッチサイズ | 全データ | 64 | 64 |
 | エポック / ステップ | 1000 epoch (MSE) | 500 epoch | n_steps 1024、実機で20エピソード |
 | その他 | – | seed 42 | 1エピソード 100 step（その他はSB3デフォルト） |
