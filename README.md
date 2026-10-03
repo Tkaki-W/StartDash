@@ -8,6 +8,13 @@
   <img width="653" height="265" alt="スクリーンショット 2026-10-03 122743" src="https://github.com/user-attachments/assets/06197cc4-cca6-465d-91a6-261b3fc9199f" />
 
 </p>
+<iframe width="560" height="315" 
+        src="https://www.youtube.com/embed/dQw4w9WgXcQ" 
+        title="YouTube video player" 
+        frameborder="0" 
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+        allowfullscreen>
+</iframe>
 
 ## 動作の流れ
 
