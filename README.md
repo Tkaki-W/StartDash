@@ -58,7 +58,11 @@ flowchart LR
 | `envs/robot_hand_env.py` | Gymnasium環境（観測・行動・報酬の定義） |
 | `hardware/hardware_interface.py` | マスター手袋・スレーブハンド・CNCステージ・触覚センサ3個のシリアル通信 |
 | `arduino_code/` | マスター手袋 (`master_serial`) / スレーブハンド (`slave_serial`) のArduinoコード |
+<h4>マスタースレーブを使った模倣学習データ収集の様子
 
+https://github.com/user-attachments/assets/d16abca1-3721-4419-8b56-28dc3fb99d54
+
+</h4>
 ## モデルの入出力
 
 <!-- 📷 画像: アーキテクチャ図（スライド「アーキテクチャの変更」） -->
